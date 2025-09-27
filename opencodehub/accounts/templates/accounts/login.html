@@ -1,0 +1,86 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Sign In - OpenCodeHub{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h2>Sign In</h2>
+            <p>Welcome back! Please sign in to your account.</p>
+        </div>
+        
+        <form method="post">
+            {% csrf_token %}
+            
+            <!-- Username/Email Field -->
+            <div class="mb-3">
+                {{ form.username }}
+                {% if form.username.errors %}
+                    <div class="text-danger small mt-1">
+                        {% for error in form.username.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            
+            <!-- Password Field -->
+            <div class="mb-3">
+                {{ form.password }}
+                {% if form.password.errors %}
+                    <div class="text-danger small mt-1">
+                        {% for error in form.password.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            
+            <!-- Non-field errors -->
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                        {{ error }}
+                    {% endfor %}
+                </div>
+            {% endif %}
+            
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-sign-in-alt"></i> Sign In
+            </button>
+        </form>
+        
+        <div class="auth-links">
+            <p><a href="{% url 'password_reset' %}">Forgot your password?</a></p>
+            <div class="divider">
+                <span>Don't have an account?</span>
+            </div>
+            <a href="{% url 'register' %}" class="btn btn-outline-primary">
+                <i class="fas fa-user-plus"></i> Create an Account
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .btn-outline-primary {
+        background: transparent;
+        border: 2px solid #667eea;
+        color: #667eea;
+        border-radius: 12px;
+        padding: 12px 24px;
+        font-weight: 600;
+        font-size: 16px;
+        width: 100%;
+        transition: all 0.3s ease;
+        margin-top: 10px;
+    }
+    
+    .btn-outline-primary:hover {
+        background: #667eea;
+        color: white;
+        transform: translateY(-2px);
+    }
+</style>
+{% endblock %}
