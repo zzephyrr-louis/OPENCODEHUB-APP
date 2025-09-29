@@ -63,3 +63,5 @@ staticfiles/
 Thumbs.db
 
 venv/
+opencodehub/opencodehub/__pycache__/settings.cpython-313.pyc
+opencodehub/opencodehub/__pycache__/settings.cpython-313.pyc
