@@ -6,6 +6,10 @@ from django.contrib import messages
 from django.urls import reverse_lazy
 from django.views.generic import CreateView
 from .forms import CustomUserCreationForm, CustomLoginForm, CustomPasswordResetForm
+from .models import Project, ProjectFile, Comment
+from django.shortcuts import get_object_or_404
+import os
+
 
 def home(request):
     """Home page view"""
@@ -53,8 +57,17 @@ class CustomLoginView(LoginView):
 @login_required
 def dashboard(request):
     """Dashboard view for authenticated users"""
+    user = request.user
+    projects = Project.objects.filter(owner=user)
+    total_files = ProjectFile.objects.filter(project__owner=user).count()
+    total_comments = Comment.objects.filter(author=user).count()
+    
     return render(request, 'accounts/dashboard.html', {
-        'user': request.user
+        'user': user,
+        'project_count': projects.count(),
+        'file_count': total_files,
+        'comment_count': total_comments,
+        'recent_projects': projects.order_by('-updated_at')[:3]
     })
 
 def custom_logout(request):
@@ -76,3 +89,82 @@ class CustomPasswordResetView(PasswordResetView):
     def form_valid(self, form):
         messages.success(self.request, 'Password reset email has been sent to your email address.')
         return super().form_valid(form)
+    
+
+    
+
+@login_required
+def create_project(request):
+    """Create new project"""
+    if request.method == 'POST':
+        title = request.POST.get('title')
+        description = request.POST.get('description')
+        is_public = request.POST.get('is_public') == 'on'
+        
+        project = Project.objects.create(
+            title=title,
+            description=description,
+            owner=request.user,
+            is_public=is_public
+        )
+        messages.success(request, f'Project "{title}" created successfully!')
+        return redirect('project_detail', project_id=project.id)
+    
+    return render(request, 'accounts/create_project.html')
+
+@login_required
+def project_detail(request, project_id):
+    """View project details"""
+    project = get_object_or_404(Project, id=project_id)
+    
+    # Check permissions
+    if not project.is_public and project.owner != request.user:
+        messages.error(request, 'You do not have permission to view this project.')
+        return redirect('dashboard')
+    
+    files = project.files.all()
+    comments = project.comments.all()
+    versions = project.versions.all()[:5]  # Latest 5 versions
+    
+    return render(request, 'accounts/project_detail.html', {
+        'project': project,
+        'files': files,
+        'comments': comments,
+        'versions': versions
+    })
+
+@login_required
+def upload_file(request, project_id):
+    """Upload file to project"""
+    project = get_object_or_404(Project, id=project_id, owner=request.user)
+    
+    if request.method == 'POST':
+        files = request.FILES.getlist('files')
+        
+        for file in files:
+            file_type = file.name.split('.')[-1] if '.' in file.name else 'unknown'
+            
+            ProjectFile.objects.create(
+                project=project,
+                name=file.name,
+                file=file,
+                file_type=file_type,
+                size=file.size
+            )
+        
+        messages.success(request, f'{len(files)} file(s) uploaded successfully!')
+        return redirect('project_detail', project_id=project.id)
+    
+    return render(request, 'accounts/upload_file.html', {'project': project})
+
+@login_required
+def my_projects(request):
+    """List user's projects"""
+    projects = Project.objects.filter(owner=request.user).order_by('-created_at')
+    return render(request, 'accounts/my_projects.html', {'projects': projects})
+
+@login_required
+def browse_projects(request):
+    """Browse public projects"""
+    projects = Project.objects.filter(is_public=True).order_by('-created_at')
+    return render(request, 'accounts/browse_projects.html', {'projects': projects})
