@@ -24,4 +24,11 @@ urlpatterns = [
     path('reset/done/', auth_views.PasswordResetCompleteView.as_view(
         template_name='accounts/password_reset_complete.html'
     ), name='password_reset_complete'),
+    
+    # Project-related URLs
+    path('projects/create/', views.create_project, name='create_project'),
+    path('projects/my/', views.my_projects, name='my_projects'),
+    path('projects/browse/', views.browse_projects, name='browse_projects'),
+    path('projects/<int:project_id>/', views.project_detail, name='project_detail'),
+    path('projects/<int:project_id>/upload/', views.upload_file, name='upload_file'),
 ]

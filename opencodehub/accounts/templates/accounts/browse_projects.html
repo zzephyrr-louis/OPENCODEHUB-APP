@@ -1,0 +1,36 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Browse Projects - OpenCodeHub{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="text-center">
+                <h2><i class="fas fa-globe text-white"></i> Browse Public Projects</h2>
+                <p class="text-white mb-0">Discover and explore projects shared by the community</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and Filter (placeholder for future Sprint) -->
+    <div class="row mb-4">
+        <div class="col-md-8 mx-auto">
+            <div class="card shadow border-0" style="border-radius: 15px;">
+                <div class="card-body p-3">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0">
+                            <i class="fas fa-search text-muted"></i>
+                        </span>
+                        <input type="text" class="form-control border-start-0" placeholder="Search projects... (Coming soon)" disabled>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if projects %}
+    <div class="row">
+        {% for project in projects %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card project-card shadow border-0 h-100" style="border-radius: 15px;"
