@@ -56,19 +56,24 @@ class CustomLoginView(LoginView):
 
 @login_required
 def dashboard(request):
-    """Dashboard view for authenticated users"""
-    user = request.user
-    projects = Project.objects.filter(owner=user)
-    total_files = ProjectFile.objects.filter(project__owner=user).count()
-    total_comments = Comment.objects.filter(author=user).count()
+    # Get user's projects
+    projects = Project.objects.filter(owner=request.user).order_by('-updated_at')
     
-    return render(request, 'accounts/dashboard.html', {
-        'user': user,
-        'project_count': projects.count(),
-        'file_count': total_files,
-        'comment_count': total_comments,
-        'recent_projects': projects.order_by('-updated_at')[:3]
-    })
+    # Get recent activities (last 5 projects updated)
+    recent_activities = []
+    for project in projects[:5]:
+        recent_activities.append({
+            'time': f"{project.updated_at.strftime('%H:%M %p')}",
+            'project_name': project.title,
+            'description': f'Updated {project.updated_at.strftime("%B %d, %Y")}'
+        })
+    
+    context = {
+        'projects': projects,
+        'recent_activities': recent_activities,
+    }
+    
+    return render(request, 'accounts/dashboard.html', context)
 
 def custom_logout(request):
     """Custom logout view"""
