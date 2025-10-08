@@ -11,13 +11,78 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        
+        /* Navbar Styles */
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            border-bottom: none;
+            padding: 12px 0;
         }
         
         .navbar-brand {
             font-weight: bold;
             font-size: 1.5rem;
+            color: white !important;  
+            transition: color 0.2s;
+        }
+
+        .navbar-brand:hover {
+            color: rgba(255, 255, 255, 0.8) !important;  
+        }
+
+        .navbar-brand i {
+            color: white;  
         }
         
+        .nav-link {
+            color: white !important;  /* Change from #1d1d1f to white */
+            font-weight: 500;
+            padding: 8px 16px !important;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.2);  /* Light white overlay on hover */
+            color: white !important;
+        }
+        
+        .btn-outline-primary {
+            border: 2px solid white;  /* Change from #667eea to white */
+            color: white;  /* Change text to white */
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-outline-primary:hover {
+            background: white;  /* White background on hover */
+            border-color: white;
+            color: #667eea;  /* Purple text on hover */
+        }
+        
+        .btn-primary-custom {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;  /* Already white, keep it */
+            border: none;
+            padding: 8px 20px; 
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary-custom:hover {
+            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);  /* White glow */
+        }
+        
+        /* Auth Container - For Login/Register Pages */
         .auth-container {
             min-height: calc(100vh - 76px);
             display: flex;
@@ -118,27 +183,13 @@
             background: white;
             padding: 0 15px;
             color: #666;
+            position: relative;
         }
         
         .alert {
             border-radius: 12px;
             border: none;
             margin-bottom: 20px;
-        }
-        
-        .navbar {
-            background: rgba(255, 255, 255, 0.1) !important;
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .navbar-brand, .nav-link {
-            color: white !important;
-        }
-        
-        .btn-outline-light:hover {
-            background-color: rgba(255, 255, 255, 0.2);
-            border-color: white;
         }
     </style>
 </head>
@@ -149,14 +200,14 @@
                 <i class="fas fa-code"></i> OpenCodeHub
             </a>
             
-            <div class="navbar-nav ms-auto">
+            <div class="navbar-nav ms-auto d-flex align-items-center gap-2">
                 {% if user.is_authenticated %}
                     <span class="nav-link">Welcome, {{ user.first_name }}!</span>
                     <a class="nav-link" href="{% url 'dashboard' %}">Dashboard</a>
                     <a class="nav-link" href="{% url 'logout' %}">Logout</a>
                 {% else %}
-                    <a class="btn btn-outline-light me-2" href="{% url 'login' %}">Sign In</a>
-                    <a class="btn btn-light" href="{% url 'register' %}">Sign Up</a>
+                    <a class="btn btn-outline-primary me-2" href="{% url 'login' %}">Sign In</a>
+                    <a class="btn btn-primary-custom" href="{% url 'register' %}">Sign Up</a>
                 {% endif %}
             </div>
         </div>
