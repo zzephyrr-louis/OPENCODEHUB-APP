@@ -153,5 +153,5 @@ DEFAULT_FROM_EMAIL = 'OpenCodeHub <noreply@opencodehub.com>'
 
 # Login/Logout redirects
 LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'dashboard'
-LOGOUT_REDIRECT_URL = 'home'
+LOGIN_REDIRECT_URL = 'home'
+LOGOUT_REDIRECT_URL = 'landing'

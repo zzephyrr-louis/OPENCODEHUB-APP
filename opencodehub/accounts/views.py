@@ -11,11 +11,11 @@ from django.shortcuts import get_object_or_404
 import os
 
 
-def home(request):
-    """Home page view"""
+def landing(request):
+    """Landing page view"""
     if request.user.is_authenticated:
-        return redirect('dashboard')
-    return render(request, 'accounts/home.html')
+        return redirect('home')
+    return render(request, 'accounts/landing.html')
 
 class CustomRegisterView(CreateView):
     """Registration view"""
@@ -34,7 +34,7 @@ class CustomRegisterView(CreateView):
 
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            return redirect('dashboard')
+            return redirect('home')
         return super().dispatch(request, *args, **kwargs)
 
 class CustomLoginView(LoginView):
@@ -44,7 +44,7 @@ class CustomLoginView(LoginView):
     redirect_authenticated_user = True
     
     def get_success_url(self):
-        return reverse_lazy('dashboard')
+        return reverse_lazy('home')
 
     def form_valid(self, form):
         messages.success(self.request, f'Welcome back, {form.get_user().first_name}!')
@@ -55,7 +55,8 @@ class CustomLoginView(LoginView):
         return super().form_invalid(form)
 
 @login_required
-def dashboard(request):
+def home(request):
+    """Home/Dashboard page view"""
     # Get user's projects
     projects = Project.objects.filter(owner=request.user).order_by('-updated_at')
     
@@ -73,7 +74,7 @@ def dashboard(request):
         'recent_activities': recent_activities,
     }
     
-    return render(request, 'accounts/dashboard.html', context)
+    return render(request, 'accounts/home.html', context)
 
 def custom_logout(request):
     """Custom logout view"""
@@ -81,7 +82,7 @@ def custom_logout(request):
     logout(request)
     if user_name:
         messages.success(request, f'Goodbye, {user_name}! You have been logged out successfully.')
-    return redirect('home')
+    return redirect('landing')
 
 class CustomPasswordResetView(PasswordResetView):
     """Custom password reset view"""
