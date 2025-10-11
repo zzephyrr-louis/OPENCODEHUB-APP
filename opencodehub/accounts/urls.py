@@ -3,14 +3,14 @@ from django.contrib.auth import views as auth_views
 from . import views
 
 urlpatterns = [
-    # Home page
-    path('', views.home, name='home'),
+    # Landing page
+    path('', views.landing, name='landing'),
     
     # Authentication URLs
     path('register/', views.CustomRegisterView.as_view(), name='register'),
     path('login/', views.CustomLoginView.as_view(), name='login'),
     path('logout/', views.custom_logout, name='logout'),
-    path('dashboard/', views.dashboard, name='dashboard'),
+    path('home/', views.home, name='home'),
     
     # Password Reset URLs
     path('password-reset/', views.CustomPasswordResetView.as_view(), name='password_reset'),
