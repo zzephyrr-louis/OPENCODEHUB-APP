@@ -8,6 +8,8 @@ from django.views.generic import CreateView
 from .forms import CustomUserCreationForm, CustomLoginForm, CustomPasswordResetForm
 from .models import Project, ProjectFile, Comment
 from django.shortcuts import get_object_or_404
+from django.db.models import Q
+from django.contrib.auth.models import User
 import os
 
 
@@ -123,10 +125,22 @@ def project_detail(request, project_id):
     """View project details"""
     project = get_object_or_404(Project, id=project_id)
     
-    # Check permissions
-    if not project.is_public and project.owner != request.user:
+    # UPDATED: Check permissions - allow owner, shared users, or public projects
+    if not project.is_public and project.owner != request.user and request.user not in project.shared_with.all():
         messages.error(request, 'You do not have permission to view this project.')
-        return redirect('dashboard')
+        return redirect('home')
+    
+    # UPDATED: Handle comment posting
+    if request.method == 'POST':
+        comment_text = request.POST.get('text')
+        if comment_text:
+            Comment.objects.create(
+                project=project,
+                author=request.user,
+                content=comment_text
+            )
+            messages.success(request, 'Comment added successfully!')
+            return redirect('project_detail', project_id=project.id)
     
     files = project.files.all()
     comments = project.comments.all()
@@ -142,7 +156,13 @@ def project_detail(request, project_id):
 @login_required
 def upload_file(request, project_id):
     """Upload file to project"""
-    project = get_object_or_404(Project, id=project_id, owner=request.user)
+    # UPDATED: Allow owner and shared users to upload files
+    project = get_object_or_404(Project, id=project_id)
+    
+    # Check if user is owner or has access
+    if project.owner != request.user and request.user not in project.shared_with.all():
+        messages.error(request, 'You do not have permission to upload files to this project.')
+        return redirect('project_detail', project_id=project.id)
     
     if request.method == 'POST':
         files = request.FILES.getlist('files')
@@ -169,8 +189,100 @@ def my_projects(request):
     projects = Project.objects.filter(owner=request.user).order_by('-created_at')
     return render(request, 'accounts/my_projects.html', {'projects': projects})
 
+# =========== UPDATED BROWSE PROJECTS ============
 @login_required
 def browse_projects(request):
-    """Browse public projects"""
-    projects = Project.objects.filter(is_public=True).order_by('-created_at')
-    return render(request, 'accounts/browse_projects.html', {'projects': projects})
+    """Browse all public projects with search and filter"""
+    
+    # Get search query from URL parameters
+    search_query = request.GET.get('search', '')
+    
+    # Start with all public projects, excluding user's own projects
+    projects = Project.objects.filter(is_public=True).exclude(owner=request.user).order_by('-updated_at')
+    
+    # Apply search filter if query exists
+    if search_query:
+        projects = projects.filter(
+            Q(title__icontains=search_query) | 
+            Q(description__icontains=search_query) |
+            Q(owner__first_name__icontains=search_query) |
+            Q(owner__last_name__icontains=search_query) |
+            Q(owner__username__icontains=search_query)
+        )
+    
+    context = {
+        'projects': projects,
+        'search_query': search_query,
+        'total_count': projects.count()
+    }
+    
+    return render(request, 'accounts/browse_projects.html', context)
+
+# ==================== NEW: SHARED WITH ME ====================
+@login_required
+def shared_with_me(request):
+    """View projects shared with the current user"""
+    
+    # Get all projects where current user is in shared_with
+    shared_projects = Project.objects.filter(
+        shared_with=request.user
+    ).order_by('-updated_at')
+    
+    context = {
+        'projects': shared_projects,
+        'total_count': shared_projects.count()
+    }
+    
+    return render(request, 'accounts/shared_with_me.html', context)
+
+# ==================== NEW: SHARE PROJECT ====================
+@login_required
+def share_project(request, project_id):
+    """Share a project with other users"""
+    project = get_object_or_404(Project, id=project_id, owner=request.user)
+    
+    if request.method == 'POST':
+        # Get username or email to share with
+        share_with = request.POST.get('share_with', '').strip()
+        
+        if not share_with:
+            messages.error(request, 'Please enter a username or email.')
+            return redirect('project_detail', project_id=project.id)
+        
+        try:
+            # Find user by username or email
+            user_to_share = User.objects.get(
+                Q(username=share_with) | Q(email=share_with)
+            )
+            
+            # Don't allow sharing with yourself
+            if user_to_share == request.user:
+                messages.error(request, 'You cannot share a project with yourself!')
+                return redirect('project_detail', project_id=project.id)
+            
+            # Check if already shared
+            if user_to_share in project.shared_with.all():
+                messages.warning(request, f'Project is already shared with {user_to_share.username}!')
+            else:
+                # Add user to shared_with
+                project.shared_with.add(user_to_share)
+                messages.success(request, f'Project shared with {user_to_share.username}!')
+            
+        except User.DoesNotExist:
+            messages.error(request, f'User "{share_with}" not found!')
+    
+    return redirect('project_detail', project_id=project.id)
+
+
+# ==================== NEW: UNSHARE PROJECT ====================
+@login_required
+def unshare_project(request, project_id, user_id):
+    """Remove a user from project sharing"""
+    project = get_object_or_404(Project, id=project_id, owner=request.user)
+    user_to_remove = get_object_or_404(User, id=user_id)
+    
+    # Remove user from shared_with
+    project.shared_with.remove(user_to_remove)
+    messages.success(request, f'Removed {user_to_remove.username} from project!')
+    
+    return redirect('project_detail', project_id=project.id)

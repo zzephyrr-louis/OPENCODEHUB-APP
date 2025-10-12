@@ -1,6 +1,6 @@
 {% extends 'accounts/base.html' %}
 
-{% block title %}Browse Projects - OpenCodeHub{% endblock %}
+{% block title %}Shared With Me - OpenCodeHub{% endblock %}
 
 {% block content %}
 <style>
@@ -17,7 +17,7 @@
         background: #f5f5f7;
     }
 
-    /* Left Sidebar */
+    /* Left Sidebar - Same as browse_projects */
     .left-sidebar {
         width: 240px;
         background: white;
@@ -123,133 +123,108 @@
         margin: 0;
     }
 
-    /* Search Bar */
-    .search-container {
-        margin-bottom: 24px;
-    }
-
-    .search-box {
-        position: relative;
-        max-width: 500px;
-    }
-
-    .search-box input {
-        width: 100%;
-        padding: 12px 16px 12px 44px;
-        border: 2px solid #e5e5e5;
-        border-radius: 12px;
-        font-size: 14px;
-        transition: all 0.2s;
+    /* Projects Table */
+    .projects-table {
         background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
 
-    .search-box input:focus {
-        outline: none;
-        border-color: #667eea;
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-    }
-
-    .search-box i {
-        position: absolute;
-        left: 16px;
-        top: 50%;
-        transform: translateY(-50%);
-        color: #86868b;
-        font-size: 16px;
-    }
-
-    /* Projects Grid */
-    .projects-grid {
+    .table-header {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 20px;
+        grid-template-columns: 40px 2fr 180px 150px 120px 40px;
+        padding: 16px 20px;
+        background: #fafafa;
+        border-bottom: 1px solid #e5e5e5;
+        font-size: 12px;
+        font-weight: 600;
+        color: #86868b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
 
-    .project-card {
-        background: white;
-        border-radius: 12px;
-        padding: 20px;
-        cursor: pointer;
-        transition: all 0.2s;
-        border: 1px solid #e5e5e5;
-    }
-
-    .project-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-        border-color: #667eea;
-    }
-
-    .project-header {
-        display: flex;
+    .project-row {
+        display: grid;
+        grid-template-columns: 40px 2fr 180px 150px 120px 40px;
+        padding: 16px 20px;
+        border-bottom: 1px solid #f0f0f0;
         align-items: center;
-        gap: 12px;
-        margin-bottom: 12px;
+        transition: background 0.2s;
+        cursor: pointer;
+    }
+
+    .project-row:hover {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+    }
+
+    .project-row:last-child {
+        border-bottom: none;
     }
 
     .project-icon {
-        width: 40px;
-        height: 40px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 18px;
+        font-size: 20px;
+        color: #667eea;
     }
 
-    .project-title {
-        font-size: 16px;
-        font-weight: 600;
+    .project-name {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 14px;
+        font-weight: 500;
         color: #1d1d1f;
-        margin: 0;
-    }
-
-    .project-description {
-        color: #86868b;
-        font-size: 13px;
-        line-height: 1.5;
-        margin-bottom: 16px;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-
-    .project-footer {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding-top: 16px;
-        border-top: 1px solid #f0f0f0;
     }
 
     .project-owner {
         display: flex;
         align-items: center;
         gap: 8px;
-        font-size: 12px;
+        font-size: 13px;
         color: #86868b;
     }
 
     .owner-avatar {
-        width: 24px;
-        height: 24px;
+        width: 28px;
+        height: 28px;
         border-radius: 50%;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 10px;
+        font-size: 11px;
         font-weight: 600;
     }
 
     .project-time {
-        font-size: 12px;
+        font-size: 13px;
         color: #86868b;
+    }
+
+    .project-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 12px;
+        background: #e8f0fe;
+        color: #667eea;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    .project-menu {
+        color: #86868b;
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 4px;
+        transition: all 0.2s;
+    }
+
+    .project-menu:hover {
+        background: #f0f0f0;
+        color: #667eea;
     }
 
     .empty-state {
@@ -295,11 +270,11 @@
                 <i class="fas fa-briefcase"></i>
                 My work
             </a>
-            <a href="{% url 'shared_with_me' %}" class="sidebar-item">
+            <a href="{% url 'shared_with_me' %}" class="sidebar-item active">
                 <i class="fas fa-users"></i>
                 Shared with me
             </a>
-            <a href="{% url 'browse_projects' %}" class="sidebar-item active">
+            <a href="{% url 'browse_projects' %}" class="sidebar-item">
                 <i class="fas fa-globe"></i>
                 Browse
             </a>
@@ -309,69 +284,65 @@
     <!-- Main Content -->
     <div class="main-content">
         <div class="content-header">
-            <h1><i class="fas fa-globe"></i> Browse Public Projects</h1>
-            <p>Discover and explore projects shared by the community</p>
-        </div>
-
-        <!-- Search Bar -->
-        <div class="search-container">
-            <form method="GET" action="{% url 'browse_projects' %}">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input 
-                        type="text" 
-                        name="search" 
-                        placeholder="Search projects by title, description, or owner..." 
-                        value="{{ search_query }}"
-                    >
-                </div>
-            </form>
+            <h1><i class="fas fa-users"></i> Shared With Me</h1>
+            <p>Projects that others have shared with you</p>
         </div>
 
         {% if projects %}
-            <div class="projects-grid">
-                {% for project in projects %}
-                <div class="project-card" data-href="{% url 'project_detail' project.id %}">
-                    <div class="project-header">
-                        <div class="project-icon">
-                            <i class="fas fa-folder"></i>
-                        </div>
-                        <h3 class="project-title">{{ project.title }}</h3>
-                    </div>
-                    
-                    <p class="project-description">
-                        {{ project.description|default:"No description provided" }}
-                    </p>
-                    
-                    <div class="project-footer">
-                        <div class="project-owner">
-                            <div class="owner-avatar">
-                                {{ project.owner.first_name.0|upper }}{{ project.owner.last_name.0|upper }}
-                            </div>
-                            <span>{{ project.owner.first_name }} {{ project.owner.last_name }}</span>
-                        </div>
-                        <div class="project-time">
-                            {{ project.updated_at|timesince }} ago
-                        </div>
-                    </div>
+        <div class="projects-table">
+            <div class="table-header">
+                <div></div>
+                <div>NAME</div>
+                <div>SHARED BY</div>
+                <div>LAST MODIFIED</div>
+                <div>ACCESS</div>
+                <div></div>
+            </div>
+
+            {% for project in projects %}
+            <div class="project-row" data-href="{% url 'project_detail' project.id %}">
+                <div class="project-icon">
+                    <i class="fas fa-users"></i>
                 </div>
-                {% endfor %}
+                <div class="project-name">
+                    {{ project.title }}
+                </div>
+                <div class="project-owner">
+                    <div class="owner-avatar">
+                        {{ project.owner.first_name.0|upper }}{{ project.owner.last_name.0|upper }}
+                    </div>
+                    <span>{{ project.owner.first_name }} {{ project.owner.last_name }}</span>
+                </div>
+                <div class="project-time">{{ project.updated_at|timesince }} ago</div>
+                <div>
+                    <span class="project-badge">
+                        <i class="fas fa-eye"></i>
+                        View Only
+                    </span>
+                </div>
+                <div class="project-menu">
+                    <i class="fas fa-ellipsis-v"></i>
+                </div>
             </div>
+            {% endfor %}
+        </div>
         {% else %}
+        <div class="projects-table">
             <div class="empty-state">
-                <i class="fas fa-folder-open"></i>
-                <h3>No projects found</h3>
-                <p>{% if search_query %}No projects match your search.{% else %}There are no public projects yet.{% endif %}</p>
+                <i class="fas fa-users"></i>
+                <h3>No shared projects</h3>
+                <p>When someone shares a project with you, it will appear here</p>
             </div>
+        </div>
         {% endif %}
     </div>
 </div>
 
 <script>
-document.querySelectorAll('.project-card').forEach(card => {
-    card.style.cursor = 'pointer';
-    card.addEventListener('click', () => {
-        window.location.href = card.dataset.href;
+document.querySelectorAll('.project-row').forEach(row => {
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', () => {
+        window.location.href = row.dataset.href;
     });
 });
 </script>

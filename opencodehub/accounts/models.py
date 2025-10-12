@@ -17,7 +17,10 @@ class Project(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
     is_public = models.BooleanField(default=True)
-    
+
+    # FOR SHARING FUNCTIONALITY
+    shared_with = models.ManyToManyField(User, related_name='shared_projects', blank=True)
+
     def __str__(self):
         return self.title
 

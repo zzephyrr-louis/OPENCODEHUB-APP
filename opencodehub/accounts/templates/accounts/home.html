@@ -28,13 +28,22 @@
                 <i class="fas fa-briefcase"></i>
                 My work
             </a>
-            <a href="#" class="sidebar-item">
+
+             <!-- UPDATED: Changed from # to actual URL for Shared with me -->
+            <a href="{% url 'shared_with_me' %}" class="sidebar-item">
                 <i class="fas fa-user-friends"></i>
                 Shared with me
             </a>
+            
             <a href="#" class="sidebar-item">
                 <i class="fas fa-clock"></i>
                 Recent
+            </a>
+            
+            <!-- NEW: Added Browse link below Recent -->
+            <a href="{% url 'browse_projects' %}" class="sidebar-item">
+                <i class="fas fa-globe"></i>
+                Browse
             </a>
         </div>
 
@@ -78,15 +87,36 @@
             </div>
 
             {% for project in projects %}
-            <div class="project-row" onclick="window.location.href='{% url 'project_detail' project.id %}'">
+            <div class="project-row" data-href="{% url 'project_detail' project.id %}">
                 <div class="project-icon">
                     <i class="fas fa-folder"></i>
                 </div>
                 <div class="project-name">
                     {{ project.title }}
+
+                <!-- NEW: Badge to show if project is shared with others -->
+                    {% if project.shared_with.all.count > 0 %}
+                        <span class="badge" style="background: #667eea; color: white; font-size: 10px; padding: 2px 8px; border-radius: 12px; margin-left: 8px;">
+                            <i class="fas fa-users"></i> Shared
+                        </span>
+                    {% endif %}   
                 </div>
                 <div class="project-members">
                     <div class="member-avatar">{{ project.owner.first_name.0|upper }}</div>
+                
+                    <!-- NEW: Show shared user avatars -->
+                    {% for shared_user in project.shared_with.all|slice:":3" %}
+                        <div class="member-avatar" style="margin-left: -8px;">
+                            {{ shared_user.first_name.0|upper }}
+                        </div>
+                    {% endfor %}
+                    
+                    <!-- NEW: Show +N if more than 3 shared users -->
+                    {% if project.shared_with.all.count > 3 %}
+                        <div class="member-avatar" style="margin-left: -8px; background: #86868b;">
+                            +{{ project.shared_with.all.count|add:"-3" }}
+                        </div>
+                    {% endif %}
                 </div>
                 <div class="project-time">{{ project.updated_at|timesince }} ago</div>
                 <div class="project-type">
@@ -140,4 +170,13 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+document.querySelectorAll('.project-row').forEach(row => {
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', () => {
+        window.location.href = row.dataset.href;
+    });
+});
+</script>
 {% endblock %}

@@ -31,4 +31,14 @@ urlpatterns = [
     path('projects/browse/', views.browse_projects, name='browse_projects'),
     path('projects/<int:project_id>/', views.project_detail, name='project_detail'),
     path('projects/<int:project_id>/upload/', views.upload_file, name='upload_file'),
+    
+    # Browse Projects
+    path('browse/', views.browse_projects, name='browse_projects'),
+    
+    # Shared with me
+    path('shared/', views.shared_with_me, name='shared_with_me'),
+    
+    # Share/Unshare
+    path('project/<int:project_id>/share/', views.share_project, name='share_project'),
+    path('project/<int:project_id>/unshare/<int:user_id>/', views.unshare_project, name='unshare_project'),
 ]
