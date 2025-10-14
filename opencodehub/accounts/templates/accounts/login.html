@@ -125,7 +125,7 @@
     }
 
     .btn-primary, .btn-outline-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    background: #667eea !important;
     border: none;
     border-radius: 12px;
     padding: 12px 24px;
@@ -133,14 +133,20 @@
     font-size: 16px;
     width: 100%;
     color: #fff !important;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
 }
 
 .btn-primary:hover,
 .btn-outline-primary:hover {
-    transform: translateY(-2px);
-    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
-    color: #fff !important;
+    background: white !important;
+    color: #667eea !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-primary:active,
+.btn-outline-primary:active {
+    transform: translateY(0);
 }
 
     .auth-links p a {
