@@ -6,6 +6,7 @@
     <title>{% block title %}OpenCodeHub{% endblock %}</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
     <style>
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -14,32 +15,27 @@
             margin: 0;
             padding: 0;
         }
-        
-        /* Navbar Styles */
+
+        /* Navbar */
         .navbar {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-            border-bottom: none;
             padding: 12px 0;
         }
-        
+
         .navbar-brand {
             font-weight: bold;
             font-size: 1.5rem;
-            color: white !important;  
+            color: white !important;
             transition: color 0.2s;
         }
 
-        .navbar-brand:hover {
-            color: rgba(255, 255, 255, 0.8) !important;  
+        .navbar-brand i {
+            color: white;
         }
 
-        .navbar-brand i {
-            color: white;  
-        }
-        
         .nav-link {
-            color: white !important;  /* Change from #1d1d1f to white */
+            color: white !important;
             font-weight: 500;
             padding: 8px 16px !important;
             border-radius: 8px;
@@ -47,70 +43,54 @@
         }
 
         .nav-link:hover {
-            background: rgba(255, 255, 255, 0.2);  /* Light white overlay on hover */
-            color: white !important;
+            background: rgba(255, 255, 255, 0.2);
         }
-        
+
+        /* Gradient outline button */
         .btn-outline-primary {
-            border: none !important;
+            position: relative;
+            border: 2px solid transparent !important;
+            border-radius: 8px !important;
             color: white !important;
             background: transparent !important;
             padding: 8px 20px !important;
-            border-radius: 8px !important;
-            font-weight: bold !important;
-            transition: all 0.2s !important;
-            text-decoration: none !important;
-            display: inline-block !important;
-            min-width: 80px !important;
-            white-space: nowrap !important;
-            position: relative;
-            box-shadow: none !important;
-            text-transform: uppercase !important;
-            letter-spacing: 1px;
+            font-weight: 600 !important;
+            transition: all 0.3s ease-in-out !important;
+            overflow: hidden;
         }
 
-        .btn-outline-primary:after,
-        .btn-outline-primary:before {
-            content: " ";
-            width: 10px;
-            height: 10px;
+        .btn-outline-primary::before {
+            content: "";
             position: absolute;
-            border: 0px solid #000;
-            transition: all 1s;
+            inset: 0;
+            border-radius: inherit;
+            padding: 2px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-mask: 
+                linear-gradient(#fff 0 0) content-box, 
+                linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+                    mask-composite: exclude;
+            opacity: 0.7;
+            transition: opacity 0.3s ease;
         }
 
-        .btn-outline-primary:after {
-            top: -1px;
-            left: -1px;
-            border-top: 5px solid black;
-            border-left: 5px solid black;
-        }
-
-        .btn-outline-primary:before {
-            bottom: -1px;
-            right: -1px;
-            border-bottom: 5px solid black;
-            border-right: 5px solid black;
-        }
-
-        .btn-outline-primary:hover:before,
-        .btn-outline-primary:hover:after {
-            width: 100%;
-            height: 100%;
+        .btn-outline-primary:hover::before {
+            opacity: 1;
+            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
         }
 
         .btn-outline-primary:hover {
-            background: white !important;
-            border-color: white !important;
-            color: #667eea !important;
-            text-decoration: none !important;
+            color: #fff !important;
+            transform: translateY(-1px);
         }
-        
+
+        /* Filled button */
         .btn-primary-custom {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;  /* Already white, keep it */
+            color: white;
             border: none;
-            padding: 8px 20px; 
+            padding: 8px 20px;
             border-radius: 8px;
             font-weight: 500;
             transition: all 0.2s;
@@ -119,127 +99,17 @@
         .btn-primary-custom:hover {
             background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);  /* White glow */
-        }
-        
-        /* Auth Container - For Login/Register Pages */
-        .auth-container {
-            min-height: calc(100vh - 76px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px 0;
-        }
-        
-        .auth-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-            padding: 40px;
-            width: 100%;
-            max-width: 450px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        .auth-header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        
-        .auth-header h2 {
-            color: #333;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
-        
-        .auth-header p {
-            color: #666;
-            margin-bottom: 0;
-        }
-        
-        .form-control {
-            border-radius: 12px;
-            border: 2px solid #e1e8ed;
-            padding: 12px 16px;
-            font-size: 16px;
-            transition: all 0.3s ease;
-            margin-bottom: 15px;
-        }
-        
-        .form-control:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            border-radius: 12px;
-            padding: 12px 24px;
-            font-weight: 600;
-            font-size: 16px;
-            width: 100%;
-            transition: transform 0.2s ease;
-        }
-        
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
-        }
-        
-        .auth-links {
-            text-align: center;
-            margin-top: 20px;
-        }
-        
-        .auth-links a {
-            color: #667eea;
-            text-decoration: none;
-            font-weight: 500;
-        }
-        
-        .auth-links a:hover {
-            text-decoration: underline;
-        }
-        
-        .divider {
-            text-align: center;
-            margin: 20px 0;
-            position: relative;
-        }
-        
-        .divider::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: #e1e8ed;
-        }
-        
-        .divider span {
-            background: white;
-            padding: 0 15px;
-            color: #666;
-            position: relative;
-        }
-        
-        .alert {
-            border-radius: 12px;
-            border: none;
-            margin-bottom: 20px;
         }
     </style>
 </head>
+
 <body>
     <nav class="navbar navbar-expand-lg">
         <div class="container">
             <a class="navbar-brand" href="{% url 'home' %}">
                 <i class="fas fa-code"></i> OpenCodeHub
             </a>
-            
+
             <div class="navbar-nav ms-auto d-flex align-items-center gap-2">
                 {% if user.is_authenticated %}
                     <span class="nav-link">Welcome, {{ user.first_name }}!</span>
@@ -254,6 +124,7 @@
             </div>
         </div>
     </nav>
+
     {% if messages %}
         <div class="container mt-3">
             {% for message in messages %}
