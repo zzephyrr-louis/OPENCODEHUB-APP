@@ -49,7 +49,6 @@ class CustomLoginView(LoginView):
         return reverse_lazy('home')
 
     def form_valid(self, form):
-        messages.success(self.request, f'Welcome back, {form.get_user().first_name}!')
         return super().form_valid(form)
 
     def form_invalid(self, form):
@@ -80,10 +79,7 @@ def home(request):
 
 def custom_logout(request):
     """Custom logout view"""
-    user_name = request.user.first_name if request.user.is_authenticated else None
     logout(request)
-    if user_name:
-        messages.success(request, f'Goodbye, {user_name}! You have been logged out successfully.')
     return redirect('landing')
 
 class CustomPasswordResetView(PasswordResetView):
@@ -125,7 +121,7 @@ def project_detail(request, project_id):
     """View project details"""
     project = get_object_or_404(Project, id=project_id)
     
-    # UPDATED: Check permissions - allow owner, shared users, or public projects
+    # Check permissions - allow owner, shared users, or public projects
     if not project.is_public and project.owner != request.user and request.user not in project.shared_with.all():
         messages.error(request, 'You do not have permission to view this project.')
         return redirect('home')
@@ -189,7 +185,7 @@ def my_projects(request):
     projects = Project.objects.filter(owner=request.user).order_by('-created_at')
     return render(request, 'accounts/my_projects.html', {'projects': projects})
 
-# =========== UPDATED BROWSE PROJECTS ============
+# BROWSE PROJECTS 
 @login_required
 def browse_projects(request):
     """Browse all public projects with search and filter"""
@@ -218,7 +214,7 @@ def browse_projects(request):
     
     return render(request, 'accounts/browse_projects.html', context)
 
-# ==================== NEW: SHARED WITH ME ====================
+# SHARED WITH ME 
 @login_required
 def shared_with_me(request):
     """View projects shared with the current user"""
@@ -235,7 +231,7 @@ def shared_with_me(request):
     
     return render(request, 'accounts/shared_with_me.html', context)
 
-# ==================== NEW: SHARE PROJECT ====================
+# SHARE PROJECT 
 @login_required
 def share_project(request, project_id):
     """Share a project with other users"""
@@ -274,7 +270,7 @@ def share_project(request, project_id):
     return redirect('project_detail', project_id=project.id)
 
 
-# ==================== NEW: UNSHARE PROJECT ====================
+# NEW: UNSHARE PROJECT
 @login_required
 def unshare_project(request, project_id, user_id):
     """Remove a user from project sharing"""
