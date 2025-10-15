@@ -9,7 +9,7 @@ from .forms import CustomUserCreationForm, CustomLoginForm, CustomPasswordResetF
 from .models import Project, ProjectFile, Comment
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
-from django.contrib.auth.models import User
+from accounts.models import User
 import os
 
 
@@ -152,7 +152,7 @@ def project_detail(request, project_id):
 @login_required
 def upload_file(request, project_id):
     """Upload file to project"""
-    # UPDATED: Allow owner and shared users to upload files
+    # Allow owner and shared users to upload files
     project = get_object_or_404(Project, id=project_id)
     
     # Check if user is owner or has access
@@ -270,7 +270,7 @@ def share_project(request, project_id):
     return redirect('project_detail', project_id=project.id)
 
 
-# NEW: UNSHARE PROJECT
+# UNSHARE PROJECT
 @login_required
 def unshare_project(request, project_id, user_id):
     """Remove a user from project sharing"""
@@ -282,3 +282,87 @@ def unshare_project(request, project_id, user_id):
     messages.success(request, f'Removed {user_to_remove.username} from project!')
     
     return redirect('project_detail', project_id=project.id)
+
+# SECURITY QUESTION PASSWORD RESET
+def password_reset_security(request):
+    """Password reset using security question"""
+    if request.method == 'POST':
+        step = request.POST.get('step', '1')
+        
+        if step == '1':
+            # Step 1: Verify username and show security question
+            username = request.POST.get('username', '').strip()
+            
+            try:
+                user = User.objects.get(username=username)
+                
+                if not user.security_question:
+                    messages.error(request, 'This account does not have a security question set up.')
+                    return redirect('password_reset')
+                
+                # Get the question text
+                questions_dict = {
+                    'pet': "What is your first pet's name?",
+                    'city': "In what city were you born?",
+                    'school': "What is your elementary school name?",
+                    'color': "What is your favorite color?",
+                    'food': "What is your favorite food?",
+                }
+                security_question = questions_dict.get(user.security_question, user.security_question)
+                
+                return render(request, 'accounts/password_reset_security.html', {
+                    'step': 2,
+                    'username': username,
+                    'security_question': security_question
+                })
+                
+            except User.DoesNotExist:
+                messages.error(request, 'Username not found.')
+                return render(request, 'accounts/password_reset_security.html', {'step': 1})
+        
+        elif step == '2':
+            # Step 2: Verify answer and reset password
+            username = request.POST.get('username')
+            security_answer = request.POST.get('security_answer', '').lower().strip()
+            new_password = request.POST.get('new_password')
+            confirm_password = request.POST.get('confirm_password')
+            
+            try:
+                user = User.objects.get(username=username)
+                
+                if user.security_answer.lower().strip() == security_answer:
+                    if new_password == confirm_password:
+                        if len(new_password) >= 8:
+                            user.set_password(new_password)
+                            user.save()
+                            messages.success(request, 'Password reset successful! You can now login with your new password.')
+                            return redirect('login')
+                        else:
+                            messages.error(request, 'Password must be at least 8 characters long.')
+                    else:
+                        messages.error(request, 'Passwords do not match.')
+                else:
+                    messages.error(request, 'Incorrect answer to security question.')
+                
+                # Return to step 2 with error
+                questions_dict = {
+                    'pet': "What is your first pet's name?",
+                    'city': "In what city were you born?",
+                    'school': "What is your elementary school name?",
+                    'color': "What is your favorite color?",
+                    'food': "What is your favorite food?",
+                }
+                security_question = questions_dict.get(user.security_question, user.security_question)
+                
+                return render(request, 'accounts/password_reset_security.html', {
+                    'step': 2,
+                    'username': username,
+                    'security_question': security_question
+                })
+                
+            except User.DoesNotExist:
+                messages.error(request, 'An error occurred. Please try again.')
+                return redirect('password_reset')
+    
+    # GET request - show step 1
+    return render(request, 'accounts/password_reset_security.html', {'step': 1})

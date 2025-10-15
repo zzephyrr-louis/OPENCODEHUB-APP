@@ -29,9 +29,36 @@ class CustomUserCreationForm(UserCreationForm):
         })
     )
 
+    # Security Question Fields
+    SECURITY_QUESTIONS = [
+        ('', 'Select a security question'),
+        ('pet', "What is your first pet's name?"),
+        ('city', "In what city were you born?"),
+        ('school', "What is your elementary school name?"),
+        ('color', "What is your favorite color?"),
+        ('food', "What is your favorite food?"),
+    ]
+    
+    security_question = forms.ChoiceField(
+        choices=SECURITY_QUESTIONS,
+        required=True,
+        widget=forms.Select(attrs={
+            'class': 'form-control',
+        })
+    )
+    
+    security_answer = forms.CharField(
+        max_length=200,
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Your answer (case-insensitive)'
+        })
+    )
+
     class Meta:
         model = User
-        fields = ('username', 'first_name', 'last_name', 'email', 'password1', 'password2')
+        fields = ('username', 'first_name', 'last_name', 'email', 'password1', 'password2', 'security_question', 'security_answer')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -65,6 +92,8 @@ class CustomUserCreationForm(UserCreationForm):
         user.email = self.cleaned_data['email']
         user.first_name = self.cleaned_data['first_name']
         user.last_name = self.cleaned_data['last_name']
+        user.security_question = self.cleaned_data['security_question']
+        user.security_answer = self.cleaned_data['security_answer'].lower().strip()  # Store lowercase and trimmed
         if commit:
             user.save()
         return user

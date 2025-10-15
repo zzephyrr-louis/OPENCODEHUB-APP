@@ -61,6 +61,33 @@
                     </div>
                 {% endif %}
             </div>
+
+            <!-- Security Question Field -->
+            <div class="form-group">
+                <label for="id_security_question">Security Question</label>
+                {{ form.security_question }}
+                {% if form.security_question.errors %}
+                    <div class="error-message">
+                        {% for error in form.security_question.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            
+            <!-- Security Answer Field -->
+            <div class="form-group">
+                <label for="id_security_answer">Security Answer</label>
+                {{ form.security_answer }}
+                <small style="color: #999; font-size: 12px;">This will be used to reset your password if you forget it</small>
+                {% if form.security_answer.errors %}
+                    <div class="error-message">
+                        {% for error in form.security_answer.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
             
             <!-- Password Field -->
             <div class="form-group">

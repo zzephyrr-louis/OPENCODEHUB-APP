@@ -9,6 +9,11 @@ class User(AbstractUser):
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Security Question for Password Reset
+    security_question = models.CharField(max_length=200, blank=True, default='')
+    security_answer = models.CharField(max_length=200, blank=True, default='')
+
+
 class Project(models.Model):
     """Model for user projects"""
     title = models.CharField(max_length=200)
