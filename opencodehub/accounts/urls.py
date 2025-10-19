@@ -31,4 +31,8 @@ urlpatterns = [
     # Share/Unshare
     path('project/<int:project_id>/share/', views.share_project, name='share_project'),
     path('project/<int:project_id>/unshare/<int:user_id>/', views.unshare_project, name='unshare_project'),
+    
+    # Shareable Link
+    path('project/<int:project_id>/generate-link/', views.generate_share_link, name='generate_share_link'),
+    path('share/<uuid:share_uuid>/', views.view_shared_project, name='view_shared_project'),
 ]
