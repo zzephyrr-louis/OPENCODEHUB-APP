@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
+import uuid
 
 class User(AbstractUser):
     """Extended user model for OpenCodeHub"""
@@ -25,9 +26,14 @@ class Project(models.Model):
 
     # FOR SHARING FUNCTIONALITY
     shared_with = models.ManyToManyField(User, related_name='shared_projects', blank=True)
+    share_link = models.UUIDField(editable=False, unique=True, null=True, blank=True)
 
     def __str__(self):
         return self.title
+    
+    def get_shareable_link(self):
+        """Generate the full shareable URL for this project"""
+        return f"/share/{self.share_link}/"
 
 class ProjectFile(models.Model):
     """Model for files within projects"""
