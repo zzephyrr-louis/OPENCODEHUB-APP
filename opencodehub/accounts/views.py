@@ -442,3 +442,117 @@ def view_shared_project(request, share_uuid):
     except:
         messages.error(request, 'Invalid or expired share link.')
         return redirect('home')
+    
+
+# UPLOAD FOLDER
+@login_required
+def upload_folder(request):
+    """Create a new project and upload multiple files (simulate folder upload)"""
+    if request.method == 'POST':
+        folder_name = request.POST.get('folder_name', '').strip()
+        is_public = request.POST.get('is_public') == 'on'
+        files = request.FILES.getlist('files')
+        
+        if not folder_name:
+            messages.error(request, 'Please provide a folder name.')
+            return redirect('home')
+        
+        if not files:
+            messages.error(request, 'Please select at least one file.')
+            return redirect('home')
+        
+        # Create new project (folder)
+        project = Project.objects.create(
+            title=folder_name,
+            description=f'Folder containing {len(files)} file(s)',
+            owner=request.user,
+            is_public=is_public
+        )
+        
+        # Upload all files to the project
+        from django.conf import settings
+        MAX_FILE_SIZE = getattr(settings, 'MAX_FILE_SIZE', 50 * 1024 * 1024)
+        BLOCKED_EXTENSIONS = getattr(settings, 'BLOCKED_FILE_EXTENSIONS', 
+            ['.exe', '.bat', '.sh', '.cmd', '.com', '.app', '.dmg', '.deb', '.rpm'])
+        
+        successful_uploads = 0
+        failed_uploads = []
+        
+        for file in files:
+            file_name = file.name
+            file_size = file.size
+            file_extension = os.path.splitext(file_name)[1].lower()
+            
+            # Security checks
+            if file_extension in BLOCKED_EXTENSIONS:
+                failed_uploads.append(f'{file_name} (blocked file type)')
+                continue
+            
+            if file_size > MAX_FILE_SIZE:
+                failed_uploads.append(f'{file_name} (file too large)')
+                continue
+            
+            try:
+                file_type = file_extension[1:] if file_extension else 'unknown'
+                
+                ProjectFile.objects.create(
+                    project=project,
+                    name=file_name,
+                    file=file,
+                    file_type=file_type,
+                    size=file_size
+                )
+                successful_uploads += 1
+            except Exception as e:
+                failed_uploads.append(f'{file_name} (upload error)')
+        
+        # Show results
+        if successful_uploads > 0:
+            messages.success(request, f'✅ Folder "{folder_name}" created with {successful_uploads} file(s)!')
+        
+        if failed_uploads:
+            messages.warning(request, f'⚠️ {len(failed_uploads)} file(s) failed: {", ".join(failed_uploads[:3])}')
+        
+        return redirect('project_detail', project_id=project.id)
+    
+    return redirect('home')
+
+
+# CREATE DOCUMENT
+@login_required
+def create_document(request):
+    """Create a new document (Google Docs style)"""
+    if request.method == 'POST':
+        doc_title = request.POST.get('title', '').strip()
+        doc_content = request.POST.get('content', '')
+        is_public = request.POST.get('is_public') == 'on'
+        
+        if not doc_title:
+            doc_title = f'Untitled Document {timezone.now().strftime("%Y%m%d_%H%M%S")}'
+        
+        # Create project for the document
+        project = Project.objects.create(
+            title=doc_title,
+            description='Text document',
+            owner=request.user,
+            is_public=is_public
+        )
+        
+        # Create a text file with the content
+        from django.core.files.base import ContentFile
+        
+        file_content = doc_content if doc_content else '# ' + doc_title + '\n\nStart writing here...'
+        file_name = f'{doc_title}.md'
+        
+        ProjectFile.objects.create(
+            project=project,
+            name=file_name,
+            file=ContentFile(file_content.encode('utf-8'), name=file_name),
+            file_type='md',
+            size=len(file_content.encode('utf-8'))
+        )
+        
+        messages.success(request, f'✅ Document "{doc_title}" created successfully!')
+        return redirect('project_detail', project_id=project.id)
+    
+    return render(request, 'accounts/create_document.html')
