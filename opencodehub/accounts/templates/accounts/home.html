@@ -11,10 +11,9 @@
             Create
             <div class="create-dropdown" id="createDropdown">
                 <a href="{% url 'create_project' %}" class="create-dropdown-item">New Folder</a>
-                <a href="#" class="create-dropdown-item">Upload File</a>
-                <a href="#" class="create-dropdown-item">Upload Folder</a>
-                <a href="#" class="create-dropdown-item">Document</a>
-                <a href="#" class="create-dropdown-item">Code</a>
+                <a href="#" class="create-dropdown-item" onclick="event.preventDefault(); openUploadFileModal()">Upload File</a>
+                <a href="#" class="create-dropdown-item" onclick="event.preventDefault(); openUploadFolderModal()">Upload Folder</a>
+                <a href="{% url 'create_document' %}" class="create-dropdown-item">Document</a>
             </div>
         </div>
 
@@ -29,7 +28,7 @@
                 My work
             </a>
 
-             <!-- UPDATED: Changed from # to actual URL for Shared with me -->
+            <!-- UPDATED: Changed from # to actual URL for Shared with me -->
             <a href="{% url 'shared_with_me' %}" class="sidebar-item">
                 <i class="fas fa-user-friends"></i>
                 Shared with me
@@ -171,12 +170,125 @@
     </div>
 </div>
 
+<!-- Upload File Modal -->
+<div id="uploadFileModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+    <div style="background: white; border-radius: 16px; padding: 32px; max-width: 500px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+        <h2 style="margin: 0 0 24px 0; font-size: 24px; font-weight: 600; color: #1d1d1f;">Upload File</h2>
+        
+        <form id="uploadFileForm" method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-size: 14px; font-weight: 500; color: #333; margin-bottom: 8px;">Select Project</label>
+                <select name="project_id" required style="width: 100%; padding: 12px; border: 1px solid #e5e5e5; border-radius: 8px; font-size: 14px;">
+                    <option value="">Choose a project...</option>
+                    {% for project in projects %}
+                    <option value="{{ project.id }}">{{ project.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; font-size: 14px; font-weight: 500; color: #333; margin-bottom: 8px;">Select File(s)</label>
+                <input type="file" name="files" multiple required style="width: 100%; padding: 12px; border: 1px solid #e5e5e5; border-radius: 8px; font-size: 14px;">
+                <small style="color: #86868b; font-size: 12px; display: block; margin-top: 8px;">Max 50MB per file. Multiple files allowed.</small>
+            </div>
+            
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button type="button" onclick="closeUploadFileModal()" style="padding: 12px 24px; background: #f0f0f0; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; color: #333;">
+                    Cancel
+                </button>
+                <button type="submit" style="padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;">
+                    Upload
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Upload Folder Modal -->
+<div id="uploadFolderModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+    <div style="background: white; border-radius: 16px; padding: 32px; max-width: 500px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+        <h2 style="margin: 0 0 24px 0; font-size: 24px; font-weight: 600; color: #1d1d1f;">Upload Folder</h2>
+        
+        <form action="{% url 'upload_folder' %}" method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-size: 14px; font-weight: 500; color: #333; margin-bottom: 8px;">Folder Name</label>
+                <input type="text" name="folder_name" required placeholder="My Project Folder" style="width: 100%; padding: 12px; border: 1px solid #e5e5e5; border-radius: 8px; font-size: 14px;">
+            </div>
+            
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; font-size: 14px; font-weight: 500; color: #333; margin-bottom: 8px;">Select Files</label>
+                <input type="file" name="files" multiple required style="width: 100%; padding: 12px; border: 1px solid #e5e5e5; border-radius: 8px; font-size: 14px;">
+                <small style="color: #86868b; font-size: 12px; display: block; margin-top: 8px;">Select multiple files to create a folder project</small>
+            </div>
+            
+            <div style="margin-bottom: 24px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" name="is_public" style="width: 18px; height: 18px;">
+                    <span style="font-size: 14px; color: #333;">Make public</span>
+                </label>
+            </div>
+            
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button type="button" onclick="closeUploadFolderModal()" style="padding: 12px 24px; background: #f0f0f0; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; color: #333;">
+                    Cancel
+                </button>
+                <button type="submit" style="padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;">
+                    Create Folder
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 document.querySelectorAll('.project-row').forEach(row => {
     row.style.cursor = 'pointer';
     row.addEventListener('click', () => {
         window.location.href = row.dataset.href;
     });
+});
+
+// Modal functions
+function openUploadFileModal() {
+    document.getElementById('uploadFileModal').style.display = 'flex';
+    document.getElementById('createDropdown').classList.remove('show');
+}
+
+function closeUploadFileModal() {
+    document.getElementById('uploadFileModal').style.display = 'none';
+}
+
+function openUploadFolderModal() {
+    document.getElementById('uploadFolderModal').style.display = 'flex';
+    document.getElementById('createDropdown').classList.remove('show');
+}
+
+function closeUploadFolderModal() {
+    document.getElementById('uploadFolderModal').style.display = 'none';
+}
+
+// Close modals on background click
+document.getElementById('uploadFileModal').addEventListener('click', function(e) {
+    if (e.target === this) closeUploadFileModal();
+});
+
+document.getElementById('uploadFolderModal').addEventListener('click', function(e) {
+    if (e.target === this) closeUploadFolderModal();
+});
+
+// Handle upload file form submission
+document.getElementById('uploadFileForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const projectId = formData.get('project_id');
+    
+    // Change form action dynamically
+    this.action = `/projects/${projectId}/upload/`;
+    this.submit();
 });
 </script>
 {% endblock %}

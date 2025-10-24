@@ -22,6 +22,10 @@ urlpatterns = [
     path('projects/<int:project_id>/', views.project_detail, name='project_detail'),
     path('projects/<int:project_id>/upload/', views.upload_file, name='upload_file'),
     
+    # Upload folder and create document
+    path('upload-folder/', views.upload_folder, name='upload_folder'),
+    path('document/create/', views.create_document, name='create_document'),
+
     # Browse Projects
     path('browse/', views.browse_projects, name='browse_projects'),
     

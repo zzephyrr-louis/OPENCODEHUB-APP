@@ -155,3 +155,31 @@ DEFAULT_FROM_EMAIL = 'OpenCodeHub <noreply@opencodehub.com>'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'landing'
+
+
+# File Upload Settings
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB in bytes
+
+# Blocked file extensions for security
+BLOCKED_FILE_EXTENSIONS = [
+    '.exe',   # Windows executable
+    '.bat',   # Windows batch file
+    '.sh',    # Shell script
+    '.cmd',   # Windows command file
+    '.com',   # DOS command file
+    '.app',   # macOS application
+    '.dmg',   # macOS disk image
+    '.deb',   # Debian package
+    '.rpm',   # Red Hat package
+    '.msi',   # Windows installer
+    '.scr',   # Windows screensaver 
+    '.vbs',   # Visual Basic script
+    '.js.exe', # Disguised executable
+]
+
+# Maximum storage per user
+MAX_USER_STORAGE = 1 * 1024 * 1024 * 1024  # 1GB per user
+
+# Django's built-in file upload size limit (optional safety net)
+FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB 
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB
