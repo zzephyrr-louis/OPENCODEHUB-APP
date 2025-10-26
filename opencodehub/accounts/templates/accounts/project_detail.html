@@ -32,7 +32,7 @@
     </div>
   </div>
 
-  <!-- NEW: Share Section (Only visible to project owner) -->
+  <!-- Share Section (Only visible to project owner) -->
   {% if project.owner == user %}
   <div class="share-section card shadow-sm mb-4" style="border-radius: 15px;">
     <div class="card-body">
@@ -40,7 +40,7 @@
         <i class="fas fa-share-alt text-primary"></i> Share Project
       </h5>
       
-      <!-- NEW: Shareable Link Section -->
+      <!-- Shareable Link Section -->
       <div class="shareable-link-section mb-4 p-3" style="background: #f8f9fa; border-radius: 12px;">
         <h6 class="mb-2">
           <i class="fas fa-link text-success"></i> Public Shareable Link
@@ -104,7 +104,7 @@
         </div>
       </form>
       
-      <!-- NEW: List of people project is shared with -->
+      <!-- List of people project is shared with -->
       {% if project.shared_with.all %}
       <div class="shared-users-list">
         <h6 class="mb-3">
@@ -141,7 +141,6 @@
     </div>
   </div>
   {% endif %}
-  <!-- END: Share Section -->
 
   <!-- Files Section -->
   <div class="card shadow-sm mb-4" style="border-radius: 15px;">
@@ -165,7 +164,7 @@
         <p class="text-muted">No files uploaded yet.</p>
       {% endif %}
       
-      <!-- UPDATED: Only owner can upload files -->
+      <!-- Only owner can upload files -->
       {% if project.owner == user %}
       <a href="{% url 'upload_file' project.id %}" class="btn btn-primary btn-sm mt-3" style="border-radius: 12px;">
         <i class="fas fa-upload"></i> Upload Files
@@ -191,7 +190,7 @@
                 <div class="flex-grow-1">
                   <strong>{{ comment.author.username }}</strong>
                   <small class="text-muted">{{ comment.created_at|timesince }} ago</small>
-                  <p class="mb-0 mt-1">{{ comment.text }}</p>
+                  <p class="mb-0 mt-1">{{ comment.content }}</p>
                 </div>
               </div>
             </li>
@@ -215,25 +214,89 @@
   </div>
 
   <!-- Version History Section -->
-  <div class="card shadow-sm mb-4" style="border-radius: 15px;">
-    <div class="card-body">
-      <h5 class="card-title">
+<div class="card shadow-sm mb-4" style="border-radius: 15px;">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="card-title mb-0">
         <i class="fas fa-history text-primary"></i> Version History
       </h5>
       {% if versions %}
-        <ul class="list-group list-group-flush">
-          {% for version in versions %}
-            <li class="list-group-item">
-              <i class="fas fa-code-branch text-muted me-2"></i>
-              Version {{ version.version_number }} - {{ version.created_at|timesince }} ago
-            </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p class="text-muted">No versions available.</p>
+      <a href="{% url 'version_history' project.id %}" class="btn btn-sm btn-outline-primary" style="border-radius: 8px;">
+        <i class="fas fa-list"></i> View All
+      </a>
       {% endif %}
     </div>
+
+    {% if versions %}
+      <div class="version-timeline">
+        {% for version in versions %}
+        <div class="version-item" style="border-left: 3px solid #667eea; padding-left: 20px; margin-bottom: 20px; position: relative;">
+          <div class="version-marker" style="position: absolute; left: -8px; width: 14px; height: 14px; background: #667eea; border-radius: 50%; border: 3px solid white;"></div>
+          
+          <div class="d-flex justify-content-between align-items-start">
+            <div class="flex-grow-1">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-primary" style="border-radius: 8px;">{{ version.version_number }}</span>
+                <span class="version-action" style="color: #0d6efd; font-weight: 600;">{{ version.get_action_display }}</span>
+              </div>
+              
+              <p class="text-muted small mb-1">
+                <i class="fas fa-user"></i> {{ version.created_by.username }}
+                <span class="mx-2">•</span>
+                <i class="fas fa-clock"></i> {{ version.created_at|timesince }} ago
+              </p>
+              
+              {% if version.description %}
+              <p class="mb-2 small">{{ version.description }}</p>
+              {% endif %}
+              
+              {% if version.files_snapshot.total_files %}
+              <p class="text-muted small mb-0">
+                <i class="fas fa-file"></i> {{ version.files_snapshot.total_files }} file(s)
+              </p>
+              {% endif %}
+            </div>
+            
+            <div class="btn-group" role="group">
+              <a href="{% url 'view_version' project.id version.id %}" 
+                class="btn btn-sm btn-outline-secondary" 
+                style="border-radius: 8px 0 0 8px;"
+                title="View version details">
+                <i class="fas fa-eye"></i>
+              </a>
+              
+              {% if project.owner == user %}
+              <form method="POST" action="{% url 'restore_version' project.id version.id %}" style="display: inline; margin: 0;">
+                {% csrf_token %}
+                <button type="submit" 
+                        class="btn btn-sm btn-primary" 
+                        style="border-radius: 0 8px 8px 0;"
+                        title="Restore to this version"
+                        onclick="return confirm('Are you sure you want to restore to {{ version.version_number }}?\n\nThis will create a new version based on the selected one.')">
+                  <i class="fas fa-undo"></i>
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% if project.versions.count > versions|length %}
+      <div class="text-center mt-3">
+        <a href="{% url 'version_history' project.id %}" class="btn btn-sm btn-primary" style="border-radius: 10px;">
+          <i class="fas fa-history"></i> View All {{ project.versions.count }} Versions
+        </a>
+      </div>
+      {% endif %}
+    {% else %}
+      <div class="alert alert-info" style="border-radius: 12px;">
+        <i class="fas fa-info-circle"></i> No version history yet. Versions are automatically created when you make changes to your project.
+      </div>
+    {% endif %}
   </div>
+</div>
 </div>
 
 <style>
@@ -267,7 +330,7 @@
     transform: rotate(180deg) translateX(4px);
   }
 
-  /* NEW: Styles for share section */
+  /* Styles for share section */
   .project-header-card {
     background: white;
     padding: 2rem;
@@ -308,6 +371,38 @@
     font-weight: 600;
     margin-bottom: 1rem;
   }
+
+  .version-timeline {
+  position: relative;
+}
+
+.version-item {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.version-action {
+  font-weight: 500;
+  color: #333;
+}
+
+.version-item:hover {
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-left: -10px;
+  padding-left: 30px !important;
+  transition: all 0.2s ease;
+}
 </style>
 
 <script>
@@ -332,6 +427,24 @@ function copyShareLink() {
   }).catch(function(err) {
     alert('Failed to copy link: ' + err);
   });
+}
+
+function restoreVersion(projectId, versionId, versionNumber) {
+  if (confirm(`Are you sure you want to restore to ${versionNumber}?\n\nThis will create a new version based on the selected one.`)) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/projects/${projectId}/versions/${versionId}/restore/`;
+    
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = csrfToken;
+    form.appendChild(csrfInput);
+    
+    document.body.appendChild(form);
+    form.submit();
+  }
 }
 </script>
 {% endblock %}
