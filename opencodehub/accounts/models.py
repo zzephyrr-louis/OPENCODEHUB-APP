@@ -76,6 +76,11 @@ class ProjectVersion(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     
+    # Version file storage
+    version_file = models.FileField(upload_to='project_versions/', null=True, blank=True)
+    file_size = models.BigIntegerField(default=0)
+    file_type = models.CharField(max_length=50, blank=True)
+    is_latest = models.BooleanField(default=False)
     # Store snapshot of files at this version
     files_snapshot = models.JSONField(default=dict, blank=True)
     
@@ -84,6 +89,14 @@ class ProjectVersion(models.Model):
         unique_together = ['project', 'version_number']
     
     def __str__(self):
+        return f"{self.project.title} v{self.version_number}"
+    
+    def save(self, *args, **kwargs):
+        # Auto-mark as latest if it's the first version or explicitly set
+        if not self.pk and not ProjectVersion.objects.filter(project=self.project).exists():
+            self.is_latest = True
+        super().save(*args, **kwargs)
+
         return f"{self.project.title} {self.version_number}"
     
     def get_action_display_with_icon(self):
