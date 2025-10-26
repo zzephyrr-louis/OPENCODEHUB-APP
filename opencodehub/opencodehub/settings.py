@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'accounts',
 ]
 
@@ -183,3 +184,15 @@ MAX_USER_STORAGE = 1 * 1024 * 1024 * 1024  # 1GB per user
 # Django's built-in file upload size limit (optional safety net)
 FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB
+
+# Django REST Framework configuration
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10
+}
