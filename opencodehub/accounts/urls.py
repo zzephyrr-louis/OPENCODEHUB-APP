@@ -39,4 +39,9 @@ urlpatterns = [
     # Shareable Link
     path('project/<int:project_id>/generate-link/', views.generate_share_link, name='generate_share_link'),
     path('share/<uuid:share_uuid>/', views.view_shared_project, name='view_shared_project'),
+
+    # Version History
+    path('projects/<int:project_id>/versions/', views.version_history, name='version_history'),
+    path('projects/<int:project_id>/versions/<int:version_id>/', views.view_version, name='view_version'),
+    path('projects/<int:project_id>/versions/<int:version_id>/restore/', views.restore_version, name='restore_version'),
 ]

@@ -1,0 +1,227 @@
+{% extends 'accounts/base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <!-- Back Button -->
+    <div class="mb-4">
+        <a href="{% url 'project_detail' project.id %}" class="cs-button-6">
+        <svg class="cs-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="transform: rotate(180deg);">
+            <path d="M17.92 11.62C17.8724 11.4973 17.801 11.3851 17.71 11.29L12.71 6.29C12.6168 6.19676 12.5061 6.1228 12.3842 6.07234C12.2624 6.02188 12.1319 5.99591 12 5.99591C11.7337 5.99591 11.4783 6.1017 11.29 6.29C11.1968 6.38324 11.1228 6.49393 11.0723 6.61575C11.0219 6.73758 10.9959 6.86814 10.9959 7C10.9959 7.2663 11.1017 7.5217 11.29 7.71L14.59 11H7C6.73478 11 6.48043 11.1054 6.29289 11.2929C6.10536 11.4804 6 11.7348 6 12C6 12.2652 6.10536 12.5196 6.29289 12.7071C6.48043 12.8946 6.73478 13 7 13H14.59L11.29 16.29C11.1963 16.383 11.1219 16.4936 11.0711 16.6154C11.0203 16.7373 10.9942 16.868 10.9942 17C10.9942 17.132 11.0203 17.2627 11.0711 17.3846C11.1219 17.5064 11.1963 17.617 11.29 17.71C11.383 17.8037 11.4936 17.8781 11.6154 17.9289C11.7373 17.9797 11.868 18.0058 12 18.0058C12.132 18.0058 12.2627 17.9797 12.3846 17.9289C12.5064 17.8781 12.617 17.8037 12.71 17.71L17.71 12.71C17.801 12.6149 17.8724 12.5028 17.92 12.38C18.02 12.1365 18.02 11.8635 17.92 11.62Z" fill="currentColor"/>
+        </svg>
+        Back to Project
+        </a>
+    </div>
+
+    <!-- Version Header -->
+    <div class="version-header-card mb-4">
+        <div class="d-flex justify-content-between align-items-start">
+        <div>
+            <h2>
+            <i class="fas fa-code-branch text-primary"></i>
+            {{ version.version_number }}
+            </h2>
+            <h5 class="text-muted mb-3">{{ project.title }}</h5>
+            <div class="version-meta">
+            <span class="badge bg-primary me-2">{{ version.get_action_display }}</span>
+            <span class="text-muted">
+                <i class="fas fa-user"></i> {{ version.created_by.username }}
+            </span>
+            <span class="text-muted mx-2">•</span>
+            <span class="text-muted">
+                <i class="fas fa-clock"></i> {{ version.created_at|date:"F d, Y at g:i A" }}
+            </span>
+            </div>
+        </div>
+
+        {% if project.owner == user %}
+        <form method="POST" action="{% url 'restore_version' project.id version.id %}" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" 
+                    class="btn btn-primary" 
+                    style="border-radius: 12px;"
+                    onclick="return confirm('Are you sure you want to restore to {{ version.version_number }}?\n\nThis will create a new version based on the selected one.')">
+            <i class="fas fa-undo"></i> Restore This Version
+            </button>
+        </form>
+        {% endif %}
+        </div>
+
+        {% if version.description %}
+        <div class="mt-3 p-3" style="background: #f8f9fa; border-radius: 10px;">
+        <p class="mb-0"><strong>Description:</strong> {{ version.description }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Files Snapshot -->
+    <div class="card shadow-sm mb-4" style="border-radius: 15px;">
+        <div class="card-body">
+        <h5 class="card-title">
+            <i class="fas fa-folder-open text-warning"></i> Files at this Version
+        </h5>
+        
+        {% if snapshot_files %}
+        <div class="alert alert-info" style="border-radius: 10px;">
+            <i class="fas fa-info-circle"></i> 
+            This version contains <strong>{{ snapshot_files|length }}</strong> file(s)
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover">
+            <thead>
+                <tr>
+                <th>File Name</th>
+                <th>Type</th>
+                <th>Size</th>
+                <th>Uploaded</th>
+                <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for file in snapshot_files %}
+                <tr>
+                <td>
+                    <i class="fas fa-file text-muted me-2"></i>
+                    {{ file.name }}
+                </td>
+                <td>
+                    <span class="badge bg-secondary">{{ file.file_type|upper }}</span>
+                </td>
+                <td>
+                    {% if file.size < 1024 %}
+                    {{ file.size }} B
+                    {% elif file.size < 1048576 %}
+                    {{ file.size|filesizeformat }}
+                    {% else %}
+                    {{ file.size|filesizeformat }}
+                    {% endif %}
+                </td>
+                <td class="text-muted small">
+                    {% if file.uploaded_at %}
+                    {% load l10n %}
+                    {{ file.uploaded_at|slice:":10" }}
+                {% else %}
+                    N/A
+                {% endif %}
+                </td>
+                <td>
+                    {% if file.file_url %}
+                    <a href="{{ file.file_url }}" class="btn btn-sm btn-primary" style="border-radius: 8px;" download>
+                    <i class="fas fa-download"></i> Download
+                    </a>
+                    {% else %}
+                    <span class="text-muted small">Not available</span>
+                    {% endif %}
+                </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-warning" style="border-radius: 10px;">
+            <i class="fas fa-exclamation-triangle"></i> No files in this version snapshot.
+        </div>
+        {% endif %}
+        </div>
+    </div>
+
+    <!-- Version Metadata -->
+    <div class="card shadow-sm mb-4" style="border-radius: 15px;">
+        <div class="card-body">
+        <h5 class="card-title">
+            <i class="fas fa-info-circle text-info"></i> Version Details
+        </h5>
+        
+        <div class="row">
+            <div class="col-md-6">
+            <div class="detail-item mb-3">
+                <strong>Version Number:</strong>
+                <p>{{ version.version_number }}</p>
+            </div>
+            <div class="detail-item mb-3">
+                <strong>Created By:</strong>
+                <p>{{ version.created_by.get_full_name|default:version.created_by.username }}</p>
+            </div>
+            <div class="detail-item mb-3">
+                <strong>Action Type:</strong>
+                <p style="color: #0d6efd; font-weight: 600;">{{ version.get_action_display }}</p>
+            </div>
+            </div>
+            <div class="col-md-6">
+            <div class="detail-item mb-3">
+                <strong>Created At:</strong>
+                <p>{{ version.created_at|date:"F d, Y at g:i A" }}</p>
+            </div>
+            <div class="detail-item mb-3">
+                <strong>Time Since:</strong>
+                <p>{{ version.created_at|timesince }} ago</p>
+            </div>
+            <div class="detail-item mb-3">
+                <strong>Total Files:</strong>
+                <p>{{ snapshot_files|length }} file(s)</p>
+            </div>
+            </div>
+        </div>
+        </div>
+    </div>
+    </div>
+
+    <style>
+    .cs-button-6 {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        text-decoration: none;
+        border-radius: 12px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .cs-button-6:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        color: white;
+    }
+
+    .version-header-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .version-meta {
+        margin-top: 1rem;
+    }
+
+    .detail-item strong {
+        color: #666;
+        display: block;
+        margin-bottom: 0.25rem;
+        font-size: 0.9rem;
+    }
+
+    .detail-item p {
+        color: #333;
+        margin-bottom: 0;
+        font-size: 1rem;
+    }
+
+    .card {
+        border: none;
+    }
+
+    .table {
+        margin-bottom: 0;
+    }
+
+    .table thead {
+        background: #f8f9fa;
+    }
+</style>
+
+{% endblock %}

@@ -1,3 +1,4 @@
+from datetime import timezone
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout
 from django.contrib.auth.views import LoginView
@@ -6,12 +7,29 @@ from django.contrib import messages
 from django.urls import reverse_lazy
 from django.views.generic import CreateView
 from .forms import CustomUserCreationForm, CustomLoginForm
-from .models import Project, ProjectFile, Comment
+from .models import Project, ProjectFile, Comment, ProjectVersion
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from accounts.models import User
 import os
 
+# Helper function to create version
+def create_project_version(project, user, action='manual', description=''):
+    """Create a new version snapshot for a project"""
+    version_number = project.get_next_version_number()
+    
+    version = ProjectVersion.objects.create(
+        project=project,
+        version_number=version_number,
+        description=description,
+        action=action,
+        created_by=user
+    )
+    
+    # Create snapshot of current files
+    version.create_files_snapshot()
+    
+    return version
 
 def landing(request):
     """Landing page view"""
@@ -97,6 +115,15 @@ def create_project(request):
             owner=request.user,
             is_public=is_public
         )
+
+        # CREATE INITIAL VERSION
+        create_project_version(
+            project=project,
+            user=request.user,
+            action='created',
+            description=f'Project "{title}" created'
+        )
+
         messages.success(request, f'Project "{title}" created successfully!')
         return redirect('project_detail', project_id=project.id)
     
@@ -112,7 +139,7 @@ def project_detail(request, project_id):
         messages.error(request, 'You do not have permission to view this project.')
         return redirect('home')
     
-    # UPDATED: Handle comment posting
+    # Handle comment posting
     if request.method == 'POST':
         comment_text = request.POST.get('text')
         if comment_text:
@@ -121,12 +148,21 @@ def project_detail(request, project_id):
                 author=request.user,
                 content=comment_text
             )
+
+            # CREATE VERSION FOR COMMENT
+            create_project_version(
+                project=project,
+                user=request.user,
+                action='comment_added',
+                description=f'Comment added by {request.user.username}'
+            )
+
             messages.success(request, 'Comment added successfully!')
             return redirect('project_detail', project_id=project.id)
     
     files = project.files.all()
     comments = project.comments.all()
-    versions = project.versions.all()[:5]  # Latest 5 versions
+    versions = project.versions.all()[:10]  # Latest 5 versions
     
     return render(request, 'accounts/project_detail.html', {
         'project': project,
@@ -157,6 +193,7 @@ def upload_file(request, project_id):
         
         successful_uploads = 0
         failed_uploads = []
+        uploaded_files_names = [] 
         
         for file in files:
             file_name = file.name
@@ -192,6 +229,7 @@ def upload_file(request, project_id):
                     size=file_size
                 )
                 successful_uploads += 1
+                uploaded_files_names.append(file_name)
                 
             except Exception as e:
                 failed_uploads.append({
@@ -201,8 +239,18 @@ def upload_file(request, project_id):
         
         # Display appropriate messages
         if successful_uploads > 0:
+            file_list = ', '.join(uploaded_files_names[:3])
+            if len(uploaded_files_names) > 3:
+                file_list += f' and {len(uploaded_files_names) - 3} more'
+            
+            create_project_version(
+                project=project,
+                user=request.user,
+                action='file_added',
+                description=f'Added {successful_uploads} file(s): {file_list}'
+            )
             messages.success(request, f'✅ {successful_uploads} file(s) uploaded successfully!')
-        
+
         if failed_uploads:
             for failed in failed_uploads:
                 messages.error(request, f'❌ {failed["name"]}: {failed["reason"]}')
@@ -286,7 +334,7 @@ def share_project(request, project_id):
                 Q(username=share_with) | Q(email=share_with)
             )
             
-            # Don't allow sharing with yourself
+            # Sharing not allowed with oneself
             if user_to_share == request.user:
                 messages.error(request, 'You cannot share a project with yourself!')
                 return redirect('project_detail', project_id=project.id)
@@ -295,10 +343,16 @@ def share_project(request, project_id):
             if user_to_share in project.shared_with.all():
                 messages.warning(request, f'Project is already shared with {user_to_share.username}!')
             else:
-                # Add user to shared_with
                 project.shared_with.add(user_to_share)
+                
+                create_project_version(
+                    project=project,
+                    user=request.user,
+                    action='shared',
+                    description=f'Shared with {user_to_share.username}'
+                )
                 messages.success(request, f'Project shared with {user_to_share.username}!')
-            
+        
         except User.DoesNotExist:
             messages.error(request, f'User "{share_with}" not found!')
     
@@ -556,3 +610,72 @@ def create_document(request):
         return redirect('project_detail', project_id=project.id)
     
     return render(request, 'accounts/create_document.html')
+
+# View version details
+@login_required
+def view_version(request, project_id, version_id):
+    """View details of a specific version"""
+    project = get_object_or_404(Project, id=project_id)
+    version = get_object_or_404(ProjectVersion, id=version_id, project=project)
+    
+    # Check permissions
+    if not project.is_public and project.owner != request.user and request.user not in project.shared_with.all():
+        messages.error(request, 'You do not have permission to view this project.')
+        return redirect('home')
+    
+    # Get files from snapshot
+    snapshot_files = version.files_snapshot.get('files', [])
+    
+    return render(request, 'accounts/view_version.html', {
+        'project': project,
+        'version': version,
+        'snapshot_files': snapshot_files,
+    })
+
+
+# Version history page
+@login_required
+def version_history(request, project_id):
+    """View complete version history for a project"""
+    project = get_object_or_404(Project, id=project_id)
+    
+    # Check permissions
+    if not project.is_public and project.owner != request.user and request.user not in project.shared_with.all():
+        messages.error(request, 'You do not have permission to view this project.')
+        return redirect('home')
+    
+    versions = project.versions.all()
+    
+    return render(request, 'accounts/version_history.html', {
+        'project': project,
+        'versions': versions,
+    })
+
+
+# Restore version
+@login_required
+def restore_version(request, project_id, version_id):
+    """Restore project to a specific version"""
+    project = get_object_or_404(Project, id=project_id)
+    version = get_object_or_404(ProjectVersion, id=version_id, project=project)
+    
+    # Only owner can restore
+    if project.owner != request.user:
+        messages.error(request, 'Only the project owner can restore versions.')
+        return redirect('project_detail', project_id=project.id)
+    
+    if request.method == 'POST':
+        try:
+            create_project_version(
+                project=project,
+                user=request.user,
+                action='restored', 
+                description=f'🔄 Restored to {version.version_number} from {version.created_at.strftime("%Y-%m-%d %H:%M")}. Original description: {version.description}'
+            )
+            
+            messages.success(request, f'✅ Project restored to {version.version_number}!')
+            
+        except Exception as e:
+            messages.error(request, f'Failed to restore version: {str(e)}')
+    
+    return redirect('project_detail', project_id=project.id)
