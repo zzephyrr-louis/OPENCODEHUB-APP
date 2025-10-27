@@ -1,0 +1,307 @@
+{% extends 'accounts/base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <!-- Back Button -->
+    <div class="mb-4">
+        <a href="{% url 'project_detail' project.id %}" class="cs-button-6">
+        <svg class="cs-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="transform: rotate(180deg);">
+            <path d="M17.92 11.62C17.8724 11.4973 17.801 11.3851 17.71 11.29L12.71 6.29C12.6168 6.19676 12.5061 6.1228 12.3842 6.07234C12.2624 6.02188 12.1319 5.99591 12 5.99591C11.7337 5.99591 11.4783 6.1017 11.29 6.29C11.1968 6.38324 11.1228 6.49393 11.0723 6.61575C11.0219 6.73758 10.9959 6.86814 10.9959 7C10.9959 7.2663 11.1017 7.5217 11.29 7.71L14.59 11H7C6.73478 11 6.48043 11.1054 6.29289 11.2929C6.10536 11.4804 6 11.7348 6 12C6 12.2652 6.10536 12.5196 6.29289 12.7071C6.48043 12.8946 6.73478 13 7 13H14.59L11.29 16.29C11.1963 16.383 11.1219 16.4936 11.0711 16.6154C11.0203 16.7373 10.9942 16.868 10.9942 17C10.9942 17.132 11.0203 17.2627 11.0711 17.3846C11.1219 17.5064 11.1963 17.617 11.29 17.71C11.383 17.8037 11.4936 17.8781 11.6154 17.9289C11.7373 17.9797 11.868 18.0058 12 18.0058C12.132 18.0058 12.2627 17.9797 12.3846 17.9289C12.5064 17.8781 12.617 17.8037 12.71 17.71L17.71 12.71C17.801 12.6149 17.8724 12.5028 17.92 12.38C18.02 12.1365 18.02 11.8635 17.92 11.62Z" fill="currentColor"/>
+        </svg>
+        Back to Project
+        </a>
+    </div>
+
+    <!-- Page Header -->
+    <div class="page-header-card mb-4">
+        <h2>
+        <i class="fas fa-history text-primary"></i>
+        Complete Version History
+        </h2>
+        <p class="text-muted mb-0">{{ project.title }}</p>
+        <div class="mt-3">
+        <span class="badge bg-info" style="border-radius: 10px; padding: 8px 16px; font-size: 0.9rem;">
+            <i class="fas fa-code-branch"></i> {{ versions.count }} Version{{ versions.count|pluralize }}
+        </span>
+        </div>
+    </div>
+
+    {% if versions %}
+    <!-- Timeline -->
+    <div class="version-timeline-full">
+        {% for version in versions %}
+        <div class="version-card {% if forloop.first %}latest-version{% endif %}" data-version-id="{{ version.id }}">
+        <div class="version-marker-large"></div>
+        
+        <div class="version-content">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <h4 class="mb-2">
+                <span class="badge bg-primary" style="border-radius: 10px; font-size: 1rem;">
+                    {{ version.version_number }}
+                </span>
+                {% if forloop.first %}
+                <span class="badge bg-success" style="border-radius: 10px; font-size: 1rem;">
+                    <i class="fas fa-star"></i> LATEST
+                </span>
+                {% endif %}
+                <span class="ms-2" style="color: #0d6efd; font-weight: 600;">{{ version.get_action_display }}</span>
+                </h4>
+                <p class="text-muted mb-2">
+                <i class="fas fa-user"></i> <strong>{{ version.created_by.username }}</strong>
+                <span class="mx-2">•</span>
+                <i class="fas fa-calendar"></i> {{ version.created_at|date:"F d, Y" }}
+                <span class="mx-2">•</span>
+                <i class="fas fa-clock"></i> {{ version.created_at|date:"g:i A" }}
+                <span class="mx-2">•</span>
+                <span class="badge bg-secondary">{{ version.created_at|timesince }} ago</span>
+                </p>
+            </div>
+
+            <div class="btn-group" role="group">
+                <a href="{% url 'view_version' project.id version.id %}" 
+                class="btn btn-outline-primary" 
+                style="border-radius: 10px 0 0 10px;">
+                <i class="fas fa-eye"></i> View
+                </a>
+                
+                {% if project.owner == user %}
+                <form method="POST" action="{% url 'restore_version' project.id version.id %}" style="display: inline; margin: 0;">
+                {% csrf_token %}
+                <button type="submit" 
+                        class="btn btn-success" 
+                        style="border-radius: 0 10px 10px 0;"
+                        onclick="return confirm('Are you sure you want to restore to {{ version.version_number }}?\n\nThis will create a new version based on the selected one.')">
+                    <i class="fas fa-undo"></i> Restore
+                </button>
+                </form>
+                {% endif %}
+            </div>
+            </div>
+
+            {% if version.description %}
+            <div class="version-description">
+            <i class="fas fa-info-circle text-info"></i>
+            {{ version.description }}
+            </div>
+            {% endif %}
+
+            <div class="version-stats mt-3">
+            <span class="stat-badge">
+                <i class="fas fa-file"></i> {{ version.files_snapshot.total_files|default:"0" }} file{{ version.files_snapshot.total_files|default:"0"|pluralize }}
+            </span>
+            </div>
+        </div>
+        </div>
+
+        {% if not forloop.last %}
+        <div class="timeline-connector"></div>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- Summary Card -->
+    <div class="card shadow-sm mt-4" style="border-radius: 15px;">
+        <div class="card-body text-center">
+        <h5 class="mb-3">
+            <i class="fas fa-chart-line text-success"></i> Version History Summary
+        </h5>
+        <div class="row">
+            <div class="col-md-4">
+            <div class="stat-box">
+                <h3 class="text-primary">{{ versions.count }}</h3>
+                <p class="text-muted mb-0">Total Versions</p>
+            </div>
+            </div>
+            <div class="col-md-4">
+            <div class="stat-box">
+                <h3 class="text-success">{{ versions.first.created_at|date:"M d, Y" }}</h3>
+                <p class="text-muted mb-0">Latest Update</p>
+            </div>
+            </div>
+            <div class="col-md-4">
+            <div class="stat-box">
+                <h3 class="text-info">{{ project.created_at|date:"M d, Y" }}</h3>
+                <p class="text-muted mb-0">Project Created</p>
+            </div>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    {% else %}
+    <div class="card shadow-sm" style="border-radius: 15px;">
+        <div class="card-body text-center py-5">
+        <i class="fas fa-history" style="font-size: 4rem; color: #ddd;"></i>
+        <h4 class="mt-3 mb-2">No Version History</h4>
+        <p class="text-muted">This project doesn't have any version history yet.</p>
+        <p class="text-muted small">Versions are automatically created when you make changes to your project.</p>
+        </div>
+    </div>
+    {% endif %}
+    </div>
+
+    <style>
+    .cs-button-6 {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        text-decoration: none;
+        border-radius: 12px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .cs-button-6:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        color: white;
+    }
+
+    .page-header-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .version-timeline-full {
+        position: relative;
+        padding: 20px 0;
+    }
+
+    .version-card {
+        background: white;
+        border-radius: 15px;
+        padding: 2rem;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        position: relative;
+        margin-left: 40px;
+        margin-bottom: 20px;
+        transition: all 0.3s ease;
+        animation: fadeInUp 0.5s ease-out;
+    }
+
+    .version-card:hover {
+        transform: translateX(5px);
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+    }
+
+    /* Special styling for latest version */
+    .latest-version {
+        border: 2px solid #28a745;
+        box-shadow: 0 4px 20px rgba(40, 167, 69, 0.2);
+    }
+
+    .latest-version:hover {
+        box-shadow: 0 6px 25px rgba(40, 167, 69, 0.3);
+    }
+
+    .version-marker-large {
+        position: absolute;
+        left: -56px;
+        top: 30px;
+        width: 24px;
+        height: 24px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+        border: 4px solid white;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        z-index: 2;
+    }
+
+    /* Special marker for latest version */
+    .latest-version .version-marker-large {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        width: 28px;
+        height: 28px;
+        left: -58px;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+        }
+        70% {
+        box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+        }
+        100% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+        }
+    }
+
+    .timeline-connector {
+        position: absolute;
+        left: 27px;
+        width: 3px;
+        height: 20px;
+        background: linear-gradient(to bottom, #667eea, #764ba2);
+        margin: 0 0 20px 0;
+    }
+
+    .version-description {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 10px;
+        border-left: 4px solid #667eea;
+    }
+
+    .version-stats {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .stat-badge {
+        background: #e8f0fe;
+        color: #1967d2;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+
+    .stat-box {
+        padding: 1rem;
+        border-radius: 10px;
+        background: #f8f9fa;
+    }
+
+    .stat-box h3 {
+        margin-bottom: 0.5rem;
+        font-weight: 700;
+    }
+
+    .card {
+        border: none;
+    }
+
+    @keyframes fadeInUp {
+        from {
+        opacity: 0;
+        transform: translateY(20px);
+        }
+        to {
+        opacity: 1;
+        transform: translateY(0);
+        }
+    }
+
+    /* Timeline line on the left */
+    .version-timeline-full::before {
+        content: '';
+        position: absolute;
+        left: 27px;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: linear-gradient(to bottom, #667eea, #764ba2);
+        opacity: 0.3;
+    }
+</style>
+
+{% endblock %}
