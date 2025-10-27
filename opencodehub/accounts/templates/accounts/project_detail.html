@@ -237,6 +237,11 @@
             <div class="flex-grow-1">
               <div class="d-flex align-items-center gap-2 mb-1">
                 <span class="badge bg-primary" style="border-radius: 8px;">{{ version.version_number }}</span>
+                {% if forloop.first %}
+                <span class="badge bg-success" style="border-radius: 8px;">
+                  <i class="fas fa-star"></i> LATEST
+                </span>
+                {% endif %}
                 <span class="version-action" style="color: #0d6efd; font-weight: 600;">{{ version.get_action_display }}</span>
               </div>
               
