@@ -26,7 +26,10 @@ class Project(models.Model):
     is_public = models.BooleanField(default=True)
     shared_with = models.ManyToManyField(User, related_name='shared_projects', blank=True)
     share_link = models.UUIDField(editable=False, unique=True, null=True, blank=True)
-    allow_collaborators_delete = models.BooleanField(default=True)  # ADD THIS LINE
+    allow_collaborators_delete = models.BooleanField(default=True)
+    
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)  # ADD THIS LINE
 
     def get_next_version_number(self): 
         """Get the next version number for this project"""

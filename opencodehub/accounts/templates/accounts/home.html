@@ -3,6 +3,78 @@
 {% block title %}Home - OpenCodeHub{% endblock %}
 
 {% block content %}
+<style>
+.menu-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+    color: #86868b;
+}
+
+.menu-btn:hover {
+    background: #f0f0f0;
+}
+
+.project-dropdown {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: white;
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    min-width: 180px;
+    z-index: 1000;
+    margin-top: 4px;
+}
+
+.project-dropdown.show {
+    display: block;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    text-decoration: none;
+    color: #1d1d1f;
+    font-size: 14px;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+}
+
+.dropdown-item:hover {
+    background: #f0f0f0;
+}
+
+.dropdown-item:first-child {
+    border-radius: 8px 8px 0 0;
+}
+
+.dropdown-item:last-child {
+    border-radius: 0 0 8px 8px;
+}
+
+.dropdown-item-danger {
+    color: #dc3545;
+}
+
+.dropdown-item-danger:hover {
+    background: #ffe6e6;
+}
+
+.project-menu {
+    position: relative;
+}
+</style>
+
 <div class="main-layout">
     <!-- Left Sidebar -->
     <div class="left-sidebar">
@@ -28,7 +100,6 @@
                 My work
             </a>
 
-            <!-- UPDATED: Changed from # to actual URL for Shared with me -->
             <a href="{% url 'shared_with_me' %}" class="sidebar-item">
                 <i class="fas fa-user-friends"></i>
                 Shared with me
@@ -39,7 +110,7 @@
                 Recent
             </a>
             
-            <!-- NEW: Added Browse link below Recent -->
+            <!-- Browse link below Recent -->
             <a href="{% url 'browse_projects' %}" class="sidebar-item">
                 <i class="fas fa-globe"></i>
                 Browse
@@ -61,7 +132,7 @@
                 <i class="fas fa-cog"></i>
                 Setting
             </a>
-            <a href="#" class="sidebar-item">
+            <a href="{% url 'trash' %}" class="sidebar-item">
                 <i class="fas fa-trash"></i>
                 Trash
             </a>
@@ -93,7 +164,7 @@
                 <div class="project-name">
                     {{ project.title }}
 
-                <!-- NEW: Badge to show if project is shared with others -->
+                <!-- Badge to show if project is shared with others -->
                     {% if project.shared_with.all.count > 0 %}
                         <span class="badge" style="background: #667eea; color: white; font-size: 10px; padding: 2px 8px; border-radius: 12px; margin-left: 8px;">
                             <i class="fas fa-users"></i> Shared
@@ -103,14 +174,14 @@
                 <div class="project-members">
                     <div class="member-avatar">{{ project.owner.first_name.0|upper }}</div>
                 
-                    <!-- NEW: Show shared user avatars -->
+                    <!-- Show shared user avatars -->
                     {% for shared_user in project.shared_with.all|slice:":3" %}
                         <div class="member-avatar" style="margin-left: -8px;">
                             {{ shared_user.first_name.0|upper }}
                         </div>
                     {% endfor %}
                     
-                    <!-- NEW: Show +N if more than 3 shared users -->
+                    <!-- Show +N if more than 3 shared users -->
                     {% if project.shared_with.all.count > 3 %}
                         <div class="member-avatar" style="margin-left: -8px; background: #86868b;">
                             +{{ project.shared_with.all.count|add:"-3" }}
@@ -121,8 +192,18 @@
                 <div class="project-type">
                     {% if project.is_public %}Folder{% else %}Private{% endif %}
                 </div>
-                <div class="project-menu">
-                    <i class="fas fa-ellipsis-v"></i>
+                <div class="project-menu" onclick="event.stopPropagation();">
+                    <button class="menu-btn" onclick="toggleProjectMenu({{ project.id }})">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <div class="project-dropdown" id="projectMenu{{ project.id }}">
+                        <a href="{% url 'project_detail' project.id %}" class="dropdown-item">
+                            <i class="fas fa-eye"></i> Open
+                        </a>
+                        <button onclick="confirmDelete({{ project.id }}, '{{ project.title|escapejs }}')" class="dropdown-item dropdown-item-danger">
+                            <i class="fas fa-trash"></i> Move to Trash
+                        </button>
+                    </div>
                 </div>
             </div>
             {% endfor %}
@@ -244,6 +325,26 @@
     </div>
 </div>
 
+<!-- Delete Confirmation Modal -->
+<div id="deleteConfirmModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+    <div style="background: white; border-radius: 12px; padding: 24px; max-width: 400px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+        <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #1d1d1f;">Move "<span id="deleteProjectName"></span>" to trash?</h3>
+        
+        <p style="color: #666; font-size: 14px; margin-bottom: 24px; line-height: 1.5;">
+            You can restore it later from the Trash.
+        </p>
+        
+        <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <button type="button" onclick="closeDeleteModal()" style="padding: 10px 20px; background: #f0f0f0; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; color: #333;">
+                Cancel
+            </button>
+            <button type="button" onclick="proceedDelete()" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;">
+                OK
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 document.querySelectorAll('.project-row').forEach(row => {
     row.style.cursor = 'pointer';
@@ -289,6 +390,76 @@ document.getElementById('uploadFileForm').addEventListener('submit', function(e)
     // Change form action dynamically
     this.action = `/projects/${projectId}/upload/`;
     this.submit();
+});
+
+// Toggle project menu
+function toggleProjectMenu(projectId) {
+    event.stopPropagation();
+    const menu = document.getElementById('projectMenu' + projectId);
+    const allMenus = document.querySelectorAll('.project-dropdown');
+    
+    // Close all other menus
+    allMenus.forEach(m => {
+        if (m !== menu) m.classList.remove('show');
+    });
+    
+    menu.classList.toggle('show');
+}
+
+// Close menus when clicking outside
+document.addEventListener('click', function() {
+    document.querySelectorAll('.project-dropdown').forEach(menu => {
+        menu.classList.remove('show');
+    });
+});
+
+// Variables to store delete info
+let deleteProjectId = null;
+let deleteProjectName = null;
+
+// Open delete confirmation modal
+function confirmDelete(projectId, projectName) {
+    deleteProjectId = projectId;
+    deleteProjectName = projectName;
+    
+    // Set project name in modal
+    document.getElementById('deleteProjectName').textContent = projectName;
+    
+    // Show modal
+    document.getElementById('deleteConfirmModal').style.display = 'flex';
+}
+
+// Close delete modal
+function closeDeleteModal() {
+    document.getElementById('deleteConfirmModal').style.display = 'none';
+    deleteProjectId = null;
+    deleteProjectName = null;
+}
+
+// Proceed with delete
+function proceedDelete() {
+    if (deleteProjectId) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/projects/${deleteProjectId}/move-to-trash/`;
+        
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+// Close modal on background click
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('deleteConfirmModal').addEventListener('click', function(e) {
+        if (e.target === this) closeDeleteModal();
+    });
 });
 </script>
 {% endblock %}

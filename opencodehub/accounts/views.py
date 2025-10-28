@@ -1,4 +1,4 @@
-from datetime import timezone
+from django.utils import timezone
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout
 from django.contrib.auth.views import LoginView
@@ -77,8 +77,11 @@ class CustomLoginView(LoginView):
 def home(request):
     """Home/Dashboard page view"""
     # Get user's projects
-    projects = Project.objects.filter(owner=request.user).order_by('-updated_at')
-    
+    projects = Project.objects.filter(
+        owner=request.user,
+        is_deleted=False  
+    ).order_by('-updated_at')
+
     # Get recent activities (last 5 projects updated)
     recent_activities = []
     for project in projects[:5]:
@@ -943,3 +946,102 @@ def view_edit_file(request, project_id, file_id):
     }
     
     return render(request, 'accounts/view_edit_file.html', context)
+
+# MOVE TO TRASH
+@login_required
+def move_to_trash(request, project_id):
+    """Move project to trash (soft delete)"""
+    project = get_object_or_404(Project, id=project_id, owner=request.user)
+    
+    if request.method == 'POST':
+        project.is_deleted = True
+        project.deleted_at = timezone.now()
+        project.save()
+        
+        messages.success(request, f'Project "{project.title}" moved to trash!')
+        return redirect('home')
+    
+    return redirect('home')
+
+
+# VIEW TRASH
+@login_required
+def trash(request):
+    """View deleted projects"""
+    deleted_projects = Project.objects.filter(
+        owner=request.user,
+        is_deleted=True
+    ).order_by('-deleted_at')
+    
+    context = {
+        'projects': deleted_projects,
+    }
+    
+    return render(request, 'accounts/trash.html', context)
+
+
+# RESTORE FROM TRASH
+@login_required
+def restore_from_trash(request, project_id):
+    """Restore project from trash"""
+    project = get_object_or_404(Project, id=project_id, owner=request.user, is_deleted=True)
+    
+    if request.method == 'POST':
+        project.is_deleted = False
+        project.deleted_at = None
+        project.save()
+        
+        messages.success(request, f'Project "{project.title}" restored!')
+        return redirect('trash')
+    
+    return redirect('trash')
+
+
+# PERMANENTLY DELETE
+@login_required
+def delete_permanently(request, project_id):
+    """Permanently delete project from trash"""
+    project = get_object_or_404(Project, id=project_id, owner=request.user, is_deleted=True)
+    
+    if request.method == 'POST':
+        project_title = project.title
+        
+        # Delete all associated files
+        for file in project.files.all():
+            if file.file:
+                file.file.delete()
+            file.delete()
+        
+        # Delete the project
+        project.delete()
+        
+        messages.success(request, f'Project "{project_title}" permanently deleted!')
+        return redirect('trash')
+    
+    return redirect('trash')
+
+
+# EMPTY TRASH
+@login_required
+def empty_trash(request):
+    """Empty entire trash"""
+    if request.method == 'POST':
+        deleted_projects = Project.objects.filter(
+            owner=request.user,
+            is_deleted=True
+        )
+        
+        count = deleted_projects.count()
+        
+        # Delete all files and projects
+        for project in deleted_projects:
+            for file in project.files.all():
+                if file.file:
+                    file.file.delete()
+                file.delete()
+            project.delete()
+        
+        messages.success(request, f'Trash emptied! {count} project(s) permanently deleted.')
+        return redirect('trash')
+    
+    return redirect('trash')
