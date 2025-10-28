@@ -679,3 +679,267 @@ def restore_version(request, project_id, version_id):
             messages.error(request, f'Failed to restore version: {str(e)}')
     
     return redirect('project_detail', project_id=project.id)
+
+# DELETE FILE
+@login_required
+def delete_file(request, project_id, file_id):
+    """Delete a file from project"""
+    project = get_object_or_404(Project, id=project_id)
+    file = get_object_or_404(ProjectFile, id=file_id, project=project)
+    
+    # Check permissions
+    can_delete = False
+    
+    # Owner can always delete
+    if project.owner == request.user:
+        can_delete = True
+    # Collaborators can delete if owner allows it
+    elif request.user in project.shared_with.all() and project.allow_collaborators_delete:
+        can_delete = True
+    
+    if not can_delete:
+        messages.error(request, 'You do not have permission to delete files from this project.')
+        return redirect('project_detail', project_id=project.id)
+    
+    if request.method == 'POST':
+        file_name = file.name
+        
+        # Delete the physical file
+        if file.file:
+            file.file.delete()
+        
+        # Delete the database record
+        file.delete()
+        
+        # Create version for file deletion
+        create_project_version(
+            project=project,
+            user=request.user,
+            action='file_deleted',
+            description=f'Deleted file: {file_name}'
+        )
+        
+        messages.success(request, f'File "{file_name}" deleted successfully!')
+        return redirect('project_detail', project_id=project.id)
+    
+    # if GET request, show confirmation modal 
+    return redirect('project_detail', project_id=project.id)
+
+
+# TOGGLE DELETE PERMISSION
+@login_required
+def toggle_delete_permission(request, project_id):
+    """Toggle collaborator delete permission"""
+    project = get_object_or_404(Project, id=project_id, owner=request.user)
+    
+    if request.method == 'POST':
+        project.allow_collaborators_delete = not project.allow_collaborators_delete
+        project.save()
+        
+        status = "enabled" if project.allow_collaborators_delete else "disabled"
+        messages.success(request, f'Collaborator file deletion {status}!')
+    
+    return redirect('project_detail', project_id=project.id)
+
+# VIEW/EDIT FILE
+@login_required
+def view_edit_file(request, project_id, file_id):
+    """View and edit file content"""
+    project = get_object_or_404(Project, id=project_id)
+    file = get_object_or_404(ProjectFile, id=file_id, project=project)
+    
+    # Check permissions
+    if not project.is_public and project.owner != request.user and request.user not in project.shared_with.all():
+        messages.error(request, 'You do not have permission to view this file.')
+        return redirect('project_detail', project_id=project.id)
+    
+    # Define editable file types
+    TEXT_EXTENSIONS = [
+        'txt', 'md', 'markdown', 'html', 'htm', 'css', 'js', 'json', 
+        'py', 'java', 'cpp', 'c', 'h', 'xml', 'yml', 'yaml', 'ini', 
+        'cfg', 'conf', 'log', 'csv', 'sql', 'sh', 'bat', 'php', 'rb',
+        'go', 'rs', 'ts', 'jsx', 'tsx', 'vue', 'swift', 'kt', 'r'
+    ]
+    WORD_EXTENSIONS = ['docx', 'doc']
+    EXCEL_EXTENSIONS = ['xlsx', 'xls']
+    
+    file_extension = file.file_type.lower()
+    file_type = 'text'  # Default
+    file_content = None
+    excel_data = None
+    is_editable = False
+    
+    # Determine file type and read content
+    if file_extension in TEXT_EXTENSIONS:
+        file_type = 'text'
+        is_editable = True
+        try:
+            with file.file.open('r', encoding='utf-8', errors='ignore') as f:
+                file_content = f.read()
+        except Exception as e:
+            messages.error(request, f'Could not read file: {str(e)}')
+            is_editable = False
+    
+    elif file_extension in WORD_EXTENSIONS:
+        file_type = 'word'
+        is_editable = True
+        try:
+            import mammoth
+            with file.file.open('rb') as docx_file:
+                result = mammoth.convert_to_html(docx_file)
+                file_content = result.value
+        except Exception as e:
+            messages.error(request, f'Could not read Word file: {str(e)}')
+            is_editable = False
+    
+    elif file_extension in EXCEL_EXTENSIONS:
+        file_type = 'excel'
+        is_editable = True
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(file.file.path)
+            sheet = wb.active
+            
+            # Convert to list of lists
+            excel_data = {
+                'headers': [],
+                'rows': []
+            }
+            
+            for i, row in enumerate(sheet.iter_rows(values_only=True)):
+                if i == 0:
+                    excel_data['headers'] = list(row)
+                else:
+                    excel_data['rows'].append(list(row))
+            
+            wb.close()
+        except Exception as e:
+            messages.error(request, f'Could not read Excel file: {str(e)}')
+            is_editable = False
+    
+    # Handle file save (POST request)
+    if request.method == 'POST' and is_editable:
+        # Check if user can edit
+        can_edit = project.owner == request.user or request.user in project.shared_with.all()
+        
+        if not can_edit:
+            messages.error(request, 'You do not have permission to edit this file.')
+            return redirect('view_edit_file', project_id=project.id, file_id=file.id)
+        
+        try:
+            if file_type == 'text':
+                # Save text file
+                new_content = request.POST.get('content', '')
+                from django.core.files.base import ContentFile
+                file.file.save(file.name, ContentFile(new_content.encode('utf-8')), save=False)
+                file.size = len(new_content.encode('utf-8'))
+                file.save()
+                file_content = new_content
+            
+            elif file_type == 'word':
+                # Save Word file
+                from docx import Document
+                import io
+                
+                new_content = request.POST.get('content', '')
+                
+                # Create new document
+                doc = Document()
+                
+                # Parse HTML content and add to document (simple conversion)
+                # Remove HTML tags for plain text
+                import re
+                clean_text = re.sub('<[^<]+?>', '', new_content)
+                
+                for paragraph in clean_text.split('\n'):
+                    if paragraph.strip():
+                        doc.add_paragraph(paragraph)
+                
+                # Save to bytes
+                doc_bytes = io.BytesIO()
+                doc.save(doc_bytes)
+                doc_bytes.seek(0)
+                
+                from django.core.files.base import ContentFile
+                file.file.save(file.name, ContentFile(doc_bytes.read()), save=False)
+                file.size = doc_bytes.tell()
+                file.save()
+                
+                # Re-read for display
+                import mammoth
+                with file.file.open('rb') as docx_file:
+                    result = mammoth.convert_to_html(docx_file)
+                    file_content = result.value
+            
+            elif file_type == 'excel':
+                # Save Excel file
+                import openpyxl
+                import json
+                
+                # Get JSON data from form
+                excel_json = request.POST.get('excel_data', '')
+                data = json.loads(excel_json)
+                
+                # Create new workbook
+                wb = openpyxl.Workbook()
+                sheet = wb.active
+                
+                # Write headers
+                if data.get('headers'):
+                    sheet.append(data['headers'])
+                
+                # Write rows
+                for row in data.get('rows', []):
+                    sheet.append(row)
+                
+                # Save to file
+                import tempfile
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+                    wb.save(tmp.name)
+                    tmp.seek(0)
+                    
+                    from django.core.files.base import ContentFile
+                    with open(tmp.name, 'rb') as f:
+                        file.file.save(file.name, ContentFile(f.read()), save=False)
+                    
+                    import os
+                    file.size = os.path.getsize(tmp.name)
+                    os.unlink(tmp.name)
+                
+                file.save()
+                
+                # Re-read for display
+                wb = openpyxl.load_workbook(file.file.path)
+                sheet = wb.active
+                excel_data = {'headers': [], 'rows': []}
+                for i, row in enumerate(sheet.iter_rows(values_only=True)):
+                    if i == 0:
+                        excel_data['headers'] = list(row)
+                    else:
+                        excel_data['rows'].append(list(row))
+                wb.close()
+            
+            # Create version for file edit
+            create_project_version(
+                project=project,
+                user=request.user,
+                action='file_updated',
+                description=f'Updated file: {file.name}'
+            )
+            
+            messages.success(request, f'File "{file.name}" saved successfully!')
+            
+        except Exception as e:
+            messages.error(request, f'Failed to save file: {str(e)}')
+    
+    context = {
+        'project': project,
+        'file': file,
+        'file_type': file_type,
+        'is_editable': is_editable,
+        'file_content': file_content,
+        'excel_data': excel_data,
+        'can_edit': project.owner == request.user or request.user in project.shared_with.all(),
+    }
+    
+    return render(request, 'accounts/view_edit_file.html', context)

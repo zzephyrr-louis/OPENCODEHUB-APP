@@ -44,4 +44,9 @@ urlpatterns = [
     path('projects/<int:project_id>/versions/', views.version_history, name='version_history'),
     path('projects/<int:project_id>/versions/<int:version_id>/', views.view_version, name='view_version'),
     path('projects/<int:project_id>/versions/<int:version_id>/restore/', views.restore_version, name='restore_version'),
+
+    # Delete and Edit Files
+    path('projects/<int:project_id>/files/<int:file_id>/delete/', views.delete_file, name='delete_file'),
+    path('projects/<int:project_id>/toggle-delete-permission/', views.toggle_delete_permission, name='toggle_delete_permission'),
+    path('projects/<int:project_id>/files/<int:file_id>/view/', views.view_edit_file, name='view_edit_file'),
 ]
