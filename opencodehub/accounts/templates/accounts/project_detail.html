@@ -152,11 +152,41 @@
         <ul class="list-group list-group-flush">
           {% for file in files %}
             <li class="list-group-item d-flex justify-content-between align-items-center">
-              <div>
+              <div class="flex-grow-1">
                 <i class="fas fa-file-alt text-muted me-2"></i>
-                <a href="{{ file.file.url }}" download>{{ file.name }}</a>
+                <a href="{% url 'view_edit_file' project.id file.id %}">{{ file.name }}</a>
               </div>
-              <span class="badge bg-secondary">{{ file.size }} bytes</span>
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-secondary">{{ file.size|filesizeformat }}</span>
+                
+                {% comment %} Open file button {% endcomment %}
+                <a href="{% url 'view_edit_file' project.id file.id %}" 
+                  class="btn btn-sm btn-primary" 
+                  style="border-radius: 8px;"
+                  title="Open file">
+                  <i class="fas fa-external-link-alt"></i>
+                </a>
+                
+                {% comment %} Download button {% endcomment %}
+                <a href="{{ file.file.url }}" 
+                  download 
+                  class="btn btn-sm btn-info" 
+                  style="border-radius: 8px;"
+                  title="Download file">
+                  <i class="fas fa-download"></i>
+                </a>
+                
+                {% comment %} Show delete button if user has permission {% endcomment %}
+                {% if project.owner == user or user in project.shared_with.all and project.allow_collaborators_delete %}
+                <button type="button" 
+                        class="btn btn-sm btn-danger" 
+                        onclick="showDeleteModal('{{ file.id }}', '{{ file.name }}')"
+                        style="border-radius: 8px;"
+                        title="Delete file">
+                  <i class="fas fa-trash"></i>
+                </button>
+                {% endif %}
+              </div>
             </li>
           {% endfor %}
         </ul>
@@ -166,9 +196,23 @@
       
       <!-- Only owner can upload files -->
       {% if project.owner == user %}
-      <a href="{% url 'upload_file' project.id %}" class="btn btn-primary btn-sm mt-3" style="border-radius: 12px;">
-        <i class="fas fa-upload"></i> Upload Files
-      </a>
+      <div class="d-flex justify-content-between align-items-center mt-3">
+        <a href="{% url 'upload_file' project.id %}" class="btn btn-primary btn-sm" style="border-radius: 12px;">
+          <i class="fas fa-upload"></i> Upload Files
+        </a>
+        
+        {% comment %} Delete permission toggle {% endcomment %}
+        <form method="POST" action="{% url 'toggle_delete_permission' project.id %}" class="d-inline">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-outline-secondary" style="border-radius: 12px;">
+            {% if project.allow_collaborators_delete %}
+              <i class="fas fa-lock-open"></i> Collaborators Can Delete
+            {% else %}
+              <i class="fas fa-lock"></i> Only Owner Can Delete
+            {% endif %}
+          </button>
+        </form>
+      </div>
       {% endif %}
     </div>
   </div>
@@ -451,5 +495,51 @@ function restoreVersion(projectId, versionId, versionNumber) {
     form.submit();
   }
 }
+
+function showDeleteModal(fileId, fileName) {
+  document.getElementById('deleteFileName').textContent = fileName;
+  
+  // Set the form action URL
+  const form = document.getElementById('deleteFileForm');
+  form.action = `/projects/{{ project.id }}/files/${fileId}/delete/`;
+  
+  // Show the modal
+  const modal = new bootstrap.Modal(document.getElementById('deleteFileModal'));
+  modal.show();
+}
 </script>
+
+<!-- Delete File Modal -->
+<div class="modal fade" id="deleteFileModal" tabindex="-1" aria-labelledby="deleteFileModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius: 15px; border: none;">
+      <div class="modal-header" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; border-radius: 15px 15px 0 0;">
+        <h5 class="modal-title" id="deleteFileModalLabel">
+          <i class="fas fa-exclamation-triangle"></i> Confirm Delete
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" style="padding: 2rem;">
+        <p class="mb-3">Are you sure you want to delete this file?</p>
+        <div class="alert alert-warning" role="alert" style="border-radius: 10px;">
+          <strong>File:</strong> <span id="deleteFileName"></span>
+        </div>
+        <p class="text-muted small mb-0">
+          <i class="fas fa-info-circle"></i> This action cannot be undone. A new version will be created.
+        </p>
+      </div>
+      <div class="modal-footer" style="border-top: none; padding: 1rem 2rem 2rem 2rem;">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="border-radius: 10px;">
+          <i class="fas fa-times"></i> Cancel
+        </button>
+        <form id="deleteFileForm" method="POST" style="display: inline;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger" style="border-radius: 10px;">
+            <i class="fas fa-trash"></i> Delete File
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
