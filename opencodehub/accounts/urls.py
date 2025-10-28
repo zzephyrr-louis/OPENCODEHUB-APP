@@ -49,4 +49,11 @@ urlpatterns = [
     path('projects/<int:project_id>/files/<int:file_id>/delete/', views.delete_file, name='delete_file'),
     path('projects/<int:project_id>/toggle-delete-permission/', views.toggle_delete_permission, name='toggle_delete_permission'),
     path('projects/<int:project_id>/files/<int:file_id>/view/', views.view_edit_file, name='view_edit_file'),
+
+    # Trash Management
+    path('trash/', views.trash, name='trash'),
+    path('projects/<int:project_id>/move-to-trash/', views.move_to_trash, name='move_to_trash'),
+    path('projects/<int:project_id>/restore/', views.restore_from_trash, name='restore_from_trash'),
+    path('projects/<int:project_id>/delete-permanently/', views.delete_permanently, name='delete_permanently'),
+    path('trash/empty/', views.empty_trash, name='empty_trash'),
 ]

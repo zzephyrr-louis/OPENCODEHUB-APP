@@ -1,0 +1,214 @@
+{% extends 'accounts/home_base.html' %}
+
+{% block title %}Trash - OpenCodeHub{% endblock %}
+
+{% block content %}
+<div class="main-layout">
+    <!-- Left Sidebar (same as home.html) -->
+    <div class="left-sidebar">
+        <div class="create-btn" onclick="toggleCreateDropdown()">
+            <i class="fas fa-plus"></i>
+            Create
+            <div class="create-dropdown" id="createDropdown">
+                <a href="{% url 'create_project' %}" class="create-dropdown-item">New Folder</a>
+                <a href="#" class="create-dropdown-item" onclick="event.preventDefault(); alert('Upload from home page')">Upload File</a>
+                <a href="#" class="create-dropdown-item" onclick="event.preventDefault(); alert('Upload from home page')">Upload Folder</a>
+                <a href="{% url 'create_document' %}" class="create-dropdown-item">Document</a>
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-section-title">Working space</div>
+            <a href="{% url 'home' %}" class="sidebar-item">
+                <i class="fas fa-home"></i>
+                Home
+            </a>
+            <a href="{% url 'my_projects' %}" class="sidebar-item">
+                <i class="fas fa-briefcase"></i>
+                My work
+            </a>
+            <a href="{% url 'shared_with_me' %}" class="sidebar-item">
+                <i class="fas fa-user-friends"></i>
+                Shared with me
+            </a>
+            <a href="#" class="sidebar-item">
+                <i class="fas fa-clock"></i>
+                Recent
+            </a>
+            <a href="{% url 'browse_projects' %}" class="sidebar-item">
+                <i class="fas fa-globe"></i>
+                Browse
+            </a>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-section-title">Personal</div>
+            <a href="#" class="sidebar-item">
+                <i class="fas fa-comment-alt"></i>
+                Messages
+                <span class="badge">N</span>
+            </a>
+            <a href="#" class="sidebar-item">
+                <i class="fas fa-bell"></i>
+                Notifications
+            </a>
+            <a href="#" class="sidebar-item">
+                <i class="fas fa-cog"></i>
+                Setting
+            </a>
+            <a href="{% url 'trash' %}" class="sidebar-item active">
+                <i class="fas fa-trash"></i>
+                Trash
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="content-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h1>Trash</h1>
+                <p style="color: #86868b; font-size: 14px; margin-top: 8px;">
+                    Items in trash will be permanently deleted after 30 days
+                </p>
+            </div>
+            {% if projects %}
+            <button onclick="emptyTrash()" class="btn-danger" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500;">
+                <i class="fas fa-trash-alt"></i> Empty Trash
+            </button>
+            {% endif %}
+        </div>
+
+        {% if projects %}
+        <div class="projects-table">
+            <div class="table-header">
+                <div></div>
+                <div>NAME</div>
+                <div>DELETED</div>
+                <div>ORIGINAL LOCATION</div>
+                <div></div>
+            </div>
+
+            {% for project in projects %}
+            <div class="project-row">
+                <div class="project-icon">
+                    <i class="fas fa-folder" style="color: #86868b;"></i>
+                </div>
+                <div class="project-name">
+                    {{ project.title }}
+                </div>
+                <div class="project-time">
+                    {{ project.deleted_at|timesince }} ago
+                </div>
+                <div class="project-type">
+                    My work
+                </div>
+                <div class="project-menu" style="display: flex; gap: 8px;">
+                    <button onclick="restoreProject({{ project.id }}, '{{ project.title|escapejs }}')" 
+                            class="btn-restore" 
+                            style="padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px;">
+                        <i class="fas fa-undo"></i> Restore
+                    </button>
+                    <button onclick="deleteForever({{ project.id }}, '{{ project.title|escapejs }}')" 
+                            class="btn-delete" 
+                            style="padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px;">
+                        <i class="fas fa-trash"></i> Delete Forever
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="projects-table">
+            <div class="empty-state">
+                <i class="fas fa-trash" style="font-size: 4rem; color: #ddd;"></i>
+                <h3>Trash is empty</h3>
+                <p>Items you delete will appear here</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right Sidebar - Info -->
+    <div class="right-sidebar">
+        <div class="timeline-header">Trash Info</div>
+        <div class="timeline" style="padding: 20px;">
+            <div style="background: #f8f9fa; padding: 16px; border-radius: 12px; margin-bottom: 16px;">
+                <h4 style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">
+                    <i class="fas fa-info-circle" style="color: #667eea;"></i> About Trash
+                </h4>
+                <p style="font-size: 13px; color: #666; line-height: 1.6;">
+                    Deleted items are kept in trash for 30 days before being permanently deleted. You can restore or permanently delete them anytime.
+                </p>
+            </div>
+            
+            {% if projects %}
+            <div style="background: #fff3cd; padding: 16px; border-radius: 12px; border-left: 4px solid #ffc107;">
+                <h4 style="font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #856404;">
+                    <i class="fas fa-exclamation-triangle"></i> Warning
+                </h4>
+                <p style="font-size: 13px; color: #856404; line-height: 1.6;">
+                    You have {{ projects.count }} item{{ projects.count|pluralize }} in trash. Empty trash to permanently delete all items.
+                </p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function restoreProject(projectId, projectName) {
+    if (confirm(`Restore "${projectName}"?`)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/projects/${projectId}/restore/`;
+        
+        const csrfToken = '{{ csrf_token }}';
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function deleteForever(projectId, projectName) {
+    if (confirm(`Permanently delete "${projectName}"?\n\nThis action CANNOT be undone!`)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/projects/${projectId}/delete-permanently/`;
+        
+        const csrfToken = '{{ csrf_token }}';
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function emptyTrash() {
+    if (confirm('Empty entire trash?\n\nALL items will be PERMANENTLY DELETED! This cannot be undone!')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{% url "empty_trash" %}';
+        
+        const csrfToken = '{{ csrf_token }}';
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}
