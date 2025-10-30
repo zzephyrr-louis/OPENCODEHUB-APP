@@ -11,25 +11,76 @@ from .models import Project, ProjectFile, Comment, ProjectVersion
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from accounts.models import User
+from django.db import transaction
+import time
 import os
 
 # Helper function to create version
 def create_project_version(project, user, action='manual', description=''):
     """Create a new version snapshot for a project"""
-    version_number = project.get_next_version_number()
     
-    version = ProjectVersion.objects.create(
-        project=project,
-        version_number=version_number,
-        description=description,
-        action=action,
-        created_by=user
-    )
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with transaction.atomic():
+                # Lock and refresh the project
+                locked_project = Project.objects.select_for_update().get(id=project.id)
+                
+                # Get latest version with explicit ordering and locking
+                latest_version = ProjectVersion.objects.select_for_update().filter(
+                    project=locked_project
+                ).order_by('-id').first()  # Use -id instead of -version_number
+                
+                if latest_version:
+                    try:
+                        # Extract number from version string (e.g., "v10" -> 10)
+                        current_num = int(latest_version.version_number.replace('v', ''))
+                        version_number = f"v{current_num + 1}"
+                    except:
+                        version_number = "v1"
+                else:
+                    version_number = "v1"
+                
+                # Create the version
+                version = ProjectVersion.objects.create(
+                    project=locked_project,
+                    version_number=version_number,
+                    description=description,
+                    action=action,
+                    created_by=user
+                )
+                
+                # Create snapshot of current files
+                version.create_files_snapshot()
+                
+                return version
+                
+        except Exception as e:
+            if 'duplicate' in str(e).lower() or 'unique constraint' in str(e).lower():
+                if attempt < max_retries - 1:
+                    # Wait a tiny bit and retry
+                    time.sleep(0.1)
+                    continue
+                else:
+                    # Last attempt - try with timestamp
+                    import datetime
+                    timestamp = datetime.datetime.now().strftime('%H%M%S%f')
+                    version_number = f"v{timestamp}"
+                    
+                    with transaction.atomic():
+                        version = ProjectVersion.objects.create(
+                            project=project,
+                            version_number=version_number,
+                            description=description,
+                            action=action,
+                            created_by=user
+                        )
+                        version.create_files_snapshot()
+                        return version
+            else:
+                raise
     
-    # Create snapshot of current files
-    version.create_files_snapshot()
-    
-    return version
+    return None
 
 def landing(request):
     """Landing page view"""

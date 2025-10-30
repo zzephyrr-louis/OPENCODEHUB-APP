@@ -156,12 +156,92 @@
     </div>
 </div>
 
+<!-- Delete Forever Confirmation Modal -->
+<div id="deletePermanentModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+    <div style="background: white; border-radius: 12px; padding: 24px; max-width: 450px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+        <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #1d1d1f;">
+            Permanently delete "<span id="deletePermanentName"></span>"?
+        </h3>
+        
+        <p style="color: #dc3545; font-size: 14px; margin-bottom: 24px; line-height: 1.5; font-weight: 500;">
+            This action CANNOT be undone!
+        </p>
+        
+        <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <button type="button" onclick="closeDeletePermanentModal()" style="padding: 10px 20px; background: #f0f0f0; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; color: #333;">
+                Cancel
+            </button>
+            <button type="button" onclick="proceedDeletePermanent()" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;">
+                OK
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Empty Trash Confirmation Modal -->
+<div id="emptyTrashModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+    <div style="background: white; border-radius: 12px; padding: 24px; max-width: 450px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+        <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #1d1d1f;">
+            Empty entire trash?
+        </h3>
+        
+        <p style="color: #dc3545; font-size: 14px; margin-bottom: 24px; line-height: 1.5; font-weight: 500;">
+            ALL items will be PERMANENTLY DELETED! This cannot be undone!
+        </p>
+        
+        <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <button type="button" onclick="closeEmptyTrashModal()" style="padding: 10px 20px; background: #f0f0f0; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; color: #333;">
+                Cancel
+            </button>
+            <button type="button" onclick="proceedEmptyTrash()" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;">
+                OK
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Restore Confirmation Modal -->
+<div id="restoreModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+    <div style="background: white; border-radius: 12px; padding: 24px; max-width: 400px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+        <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #1d1d1f;">
+            Restore "<span id="restoreProjectName"></span>"?
+        </h3>
+        
+        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
+            <button type="button" onclick="closeRestoreModal()" style="padding: 10px 20px; background: #f0f0f0; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; color: #333;">
+                Cancel
+            </button>
+            <button type="button" onclick="proceedRestore()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;">
+                OK
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
+// Restore Project - Variables
+let restoreProjectId = null;
+let restoreProjectName = null;
+
 function restoreProject(projectId, projectName) {
-    if (confirm(`Restore "${projectName}"?`)) {
+    restoreProjectId = projectId;
+    restoreProjectName = projectName;
+    
+    document.getElementById('restoreProjectName').textContent = projectName;
+    document.getElementById('restoreModal').style.display = 'flex';
+}
+
+function closeRestoreModal() {
+    document.getElementById('restoreModal').style.display = 'none';
+    restoreProjectId = null;
+    restoreProjectName = null;
+}
+
+function proceedRestore() {
+    if (restoreProjectId) {
         const form = document.createElement('form');
         form.method = 'POST';
-        form.action = `/projects/${projectId}/restore/`;
+        form.action = `/projects/${restoreProjectId}/restore/`;
         
         const csrfToken = '{{ csrf_token }}';
         const csrfInput = document.createElement('input');
@@ -174,12 +254,30 @@ function restoreProject(projectId, projectName) {
         form.submit();
     }
 }
+
+// Delete Forever - Variables
+let deletePermanentId = null;
+let deletePermanentName = null;
 
 function deleteForever(projectId, projectName) {
-    if (confirm(`Permanently delete "${projectName}"?\n\nThis action CANNOT be undone!`)) {
+    deletePermanentId = projectId;
+    deletePermanentName = projectName;
+    
+    document.getElementById('deletePermanentName').textContent = projectName;
+    document.getElementById('deletePermanentModal').style.display = 'flex';
+}
+
+function closeDeletePermanentModal() {
+    document.getElementById('deletePermanentModal').style.display = 'none';
+    deletePermanentId = null;
+    deletePermanentName = null;
+}
+
+function proceedDeletePermanent() {
+    if (deletePermanentId) {
         const form = document.createElement('form');
         form.method = 'POST';
-        form.action = `/projects/${projectId}/delete-permanently/`;
+        form.action = `/projects/${deletePermanentId}/delete-permanently/`;
         
         const csrfToken = '{{ csrf_token }}';
         const csrfInput = document.createElement('input');
@@ -193,22 +291,44 @@ function deleteForever(projectId, projectName) {
     }
 }
 
+// Empty Trash
 function emptyTrash() {
-    if (confirm('Empty entire trash?\n\nALL items will be PERMANENTLY DELETED! This cannot be undone!')) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '{% url "empty_trash" %}';
-        
-        const csrfToken = '{{ csrf_token }}';
-        const csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = 'csrfmiddlewaretoken';
-        csrfInput.value = csrfToken;
-        form.appendChild(csrfInput);
-        
-        document.body.appendChild(form);
-        form.submit();
-    }
+    document.getElementById('emptyTrashModal').style.display = 'flex';
 }
+
+function closeEmptyTrashModal() {
+    document.getElementById('emptyTrashModal').style.display = 'none';
+}
+
+function proceedEmptyTrash() {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '{% url "empty_trash" %}';
+    
+    const csrfToken = '{{ csrf_token }}';
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = csrfToken;
+    form.appendChild(csrfInput);
+    
+    document.body.appendChild(form);
+    form.submit();
+}
+
+// Close modals on background click
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('restoreModal').addEventListener('click', function(e) {
+        if (e.target === this) closeRestoreModal();
+    });
+    
+    document.getElementById('deletePermanentModal').addEventListener('click', function(e) {
+        if (e.target === this) closeDeletePermanentModal();
+    });
+    
+    document.getElementById('emptyTrashModal').addEventListener('click', function(e) {
+        if (e.target === this) closeEmptyTrashModal();
+    });
+});
 </script>
 {% endblock %}
