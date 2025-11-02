@@ -196,9 +196,15 @@
       
       <!-- Only owner can upload files -->
       {% if project.owner == user %}
-      <div class="d-flex justify-content-between align-items-center mt-3">
+      <div class="d-flex justify-content-between align-items-center mt-3 gap-2 flex-wrap">
+        <!-- Upload Files Button -->
         <a href="{% url 'upload_file' project.id %}" class="btn btn-primary btn-sm" style="border-radius: 12px;">
           <i class="fas fa-upload"></i> Upload Files
+        </a>
+        
+        <!-- Upload Version Button -->
+        <a href="{% url 'upload_version' project.id %}" class="btn btn-success btn-sm" style="border-radius: 12px;">
+          <i class="fas fa-code-branch"></i> Upload New Version
         </a>
         
         {% comment %} Delete permission toggle {% endcomment %}

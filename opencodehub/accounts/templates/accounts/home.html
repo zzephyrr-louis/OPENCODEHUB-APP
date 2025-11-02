@@ -289,21 +289,38 @@
 
 <!-- Upload Folder Modal -->
 <div id="uploadFolderModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
-    <div style="background: white; border-radius: 16px; padding: 32px; max-width: 500px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
-        <h2 style="margin: 0 0 24px 0; font-size: 24px; font-weight: 600; color: #1d1d1f;">Upload Folder</h2>
+    <div style="background: white; border-radius: 16px; padding: 32px; max-width: 600px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+        <h2 style="margin: 0 0 12px 0; font-size: 24px; font-weight: 600; color: #1d1d1f;">
+            <i class="fas fa-folder-plus"></i> Upload Folder
+        </h2>
+        <p style="color: #666; font-size: 14px; margin-bottom: 24px;">
+            Select a folder from your device to upload. All files and subfolders will be preserved.
+        </p>
         
-        <form action="{% url 'upload_folder' %}" method="POST" enctype="multipart/form-data">
+        <form id="uploadFolderForm" action="{% url 'upload_folder' %}" method="POST" enctype="multipart/form-data">
             {% csrf_token %}
             
             <div style="margin-bottom: 20px;">
-                <label style="display: block; font-size: 14px; font-weight: 500; color: #333; margin-bottom: 8px;">Folder Name</label>
-                <input type="text" name="folder_name" required placeholder="My Project Folder" style="width: 100%; padding: 12px; border: 1px solid #e5e5e5; border-radius: 8px; font-size: 14px;">
+                <label style="display: block; font-size: 14px; font-weight: 500; color: #333; margin-bottom: 8px;">
+                    <i class="fas fa-folder"></i> Select Folder from Your Device
+                </label>
+                <input type="file" id="folderUploadInput" name="files" multiple webkitdirectory directory required style="width: 100%; padding: 12px; border: 1px solid #e5e5e5; border-radius: 8px; font-size: 14px;">
+                <small style="color: #86868b; font-size: 12px; display: block; margin-top: 8px;">
+                    <i class="fas fa-info-circle"></i> Click to browse and select a folder from your computer
+                </small>
             </div>
-            
-            <div style="margin-bottom: 24px;">
-                <label style="display: block; font-size: 14px; font-weight: 500; color: #333; margin-bottom: 8px;">Select Files</label>
-                <input type="file" name="files" multiple required style="width: 100%; padding: 12px; border: 1px solid #e5e5e5; border-radius: 8px; font-size: 14px;">
-                <small style="color: #86868b; font-size: 12px; display: block; margin-top: 8px;">Select multiple files to create a folder project</small>
+
+            <!-- Folder preview -->
+            <div id="folderPreview" style="display: none; margin-bottom: 20px; padding: 16px; background: #f8f9fa; border-radius: 12px; max-height: 300px; overflow-y: auto;">
+                <div style="display: flex; justify-content: between align-items: center; margin-bottom: 12px;">
+                    <strong style="font-size: 14px; color: #333;">
+                        <i class="fas fa-folder-open"></i> Folder: <span id="folderName"></span>
+                    </strong>
+                    <span style="color: #667eea; font-size: 14px;" id="fileCount"></span>
+                </div>
+                <div id="fileList" style="font-size: 13px; color: #666; max-height: 200px; overflow-y: auto;">
+                    <!-- File list will be populated here -->
+                </div>
             </div>
             
             <div style="margin-bottom: 24px;">
@@ -317,8 +334,8 @@
                 <button type="button" onclick="closeUploadFolderModal()" style="padding: 12px 24px; background: #f0f0f0; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; color: #333;">
                     Cancel
                 </button>
-                <button type="submit" style="padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;">
-                    Create Folder
+                <button type="submit" id="uploadFolderBtn" disabled style="padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; opacity: 0.5;">
+                    <i class="fas fa-cloud-upload-alt"></i> Upload Folder
                 </button>
             </div>
         </form>
@@ -370,6 +387,107 @@ function openUploadFolderModal() {
 
 function closeUploadFolderModal() {
     document.getElementById('uploadFolderModal').style.display = 'none';
+}
+
+// Handle folder selection and preview
+document.addEventListener('DOMContentLoaded', function() {
+    const folderInput = document.getElementById('folderUploadInput');
+    
+    if (folderInput) {
+        folderInput.addEventListener('change', function(e) {
+            const files = Array.from(e.target.files);
+            
+            if (files.length > 0) {
+                // Get folder name from first file's path
+                const firstFilePath = files[0].webkitRelativePath;
+                const folderName = firstFilePath.split('/')[0];
+                
+                // Show preview
+                document.getElementById('folderPreview').style.display = 'block';
+                document.getElementById('folderName').textContent = folderName;
+                document.getElementById('fileCount').textContent = `${files.length} file(s)`;
+                
+                // Build file tree
+                const fileList = document.getElementById('fileList');
+                fileList.innerHTML = '';
+                
+                // Group files by folder structure
+                const tree = {};
+                files.forEach(file => {
+                    const path = file.webkitRelativePath;
+                    const parts = path.split('/');
+                    parts.pop(); // Remove filename
+                    
+                    let current = tree;
+                    parts.forEach(part => {
+                        if (!current[part]) {
+                            current[part] = { files: [], folders: {} };
+                        }
+                        current = current[part].folders;
+                    });
+                });
+                
+                // Display first 20 files
+                const displayFiles = files.slice(0, 20);
+                displayFiles.forEach(file => {
+                    const fileItem = document.createElement('div');
+                    fileItem.style.padding = '6px 8px';
+                    fileItem.style.borderLeft = '2px solid #667eea';
+                    fileItem.style.marginBottom = '4px';
+                    fileItem.style.paddingLeft = '12px';
+                    
+                    const relativePath = file.webkitRelativePath;
+                    const icon = getFileIcon(file.name);
+                    
+                    fileItem.innerHTML = `
+                        <i class="fas ${icon}" style="color: #667eea; margin-right: 8px;"></i>
+                        <span style="color: #666;">${relativePath}</span>
+                        <span style="color: #999; font-size: 12px; margin-left: 8px;">(${formatFileSize(file.size)})</span>
+                    `;
+                    fileList.appendChild(fileItem);
+                });
+                
+                if (files.length > 20) {
+                    const moreFiles = document.createElement('div');
+                    moreFiles.style.padding = '8px';
+                    moreFiles.style.color = '#667eea';
+                    moreFiles.style.fontStyle = 'italic';
+                    moreFiles.textContent = `... and ${files.length - 20} more files`;
+                    fileList.appendChild(moreFiles);
+                }
+                
+                // Enable upload button
+                document.getElementById('uploadFolderBtn').disabled = false;
+                document.getElementById('uploadFolderBtn').style.opacity = '1';
+                document.getElementById('uploadFolderBtn').style.cursor = 'pointer';
+            }
+        });
+    }
+});
+
+function getFileIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    const iconMap = {
+        'pdf': 'fa-file-pdf',
+        'doc': 'fa-file-word', 'docx': 'fa-file-word',
+        'xls': 'fa-file-excel', 'xlsx': 'fa-file-excel',
+        'ppt': 'fa-file-powerpoint', 'pptx': 'fa-file-powerpoint',
+        'jpg': 'fa-file-image', 'jpeg': 'fa-file-image', 'png': 'fa-file-image', 'gif': 'fa-file-image',
+        'zip': 'fa-file-archive', 'rar': 'fa-file-archive', '7z': 'fa-file-archive',
+        'mp3': 'fa-file-audio', 'wav': 'fa-file-audio',
+        'mp4': 'fa-file-video', 'avi': 'fa-file-video',
+        'js': 'fa-file-code', 'html': 'fa-file-code', 'css': 'fa-file-code', 'py': 'fa-file-code',
+        'txt': 'fa-file-alt', 'md': 'fa-file-alt'
+    };
+    return iconMap[ext] || 'fa-file';
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
 // Close modals on background click
