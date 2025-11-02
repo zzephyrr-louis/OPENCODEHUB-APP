@@ -26,14 +26,19 @@ def create_project_version(project, user, action='manual', description=''):
                 # Lock and refresh the project
                 locked_project = Project.objects.select_for_update().get(id=project.id)
                 
+                # Mark all existing versions as not latest
+                ProjectVersion.objects.filter(
+                    project=locked_project,
+                    is_latest=True
+                ).update(is_latest=False)
+                
                 # Get latest version with explicit ordering and locking
                 latest_version = ProjectVersion.objects.select_for_update().filter(
                     project=locked_project
-                ).order_by('-id').first()  # Use -id instead of -version_number
+                ).order_by('-id').first()
                 
                 if latest_version:
                     try:
-                        # Extract number from version string (e.g., "v10" -> 10)
                         current_num = int(latest_version.version_number.replace('v', ''))
                         version_number = f"v{current_num + 1}"
                     except:
@@ -41,13 +46,14 @@ def create_project_version(project, user, action='manual', description=''):
                 else:
                     version_number = "v1"
                 
-                # Create the version
+                # Create the version - it will be latest
                 version = ProjectVersion.objects.create(
                     project=locked_project,
                     version_number=version_number,
                     description=description,
                     action=action,
-                    created_by=user
+                    created_by=user,
+                    is_latest=True  # Mark as latest
                 )
                 
                 # Create snapshot of current files
@@ -58,22 +64,26 @@ def create_project_version(project, user, action='manual', description=''):
         except Exception as e:
             if 'duplicate' in str(e).lower() or 'unique constraint' in str(e).lower():
                 if attempt < max_retries - 1:
-                    # Wait a tiny bit and retry
                     time.sleep(0.1)
                     continue
                 else:
-                    # Last attempt - try with timestamp
                     import datetime
                     timestamp = datetime.datetime.now().strftime('%H%M%S%f')
                     version_number = f"v{timestamp}"
                     
                     with transaction.atomic():
+                        ProjectVersion.objects.filter(
+                            project=project,
+                            is_latest=True
+                        ).update(is_latest=False)
+                        
                         version = ProjectVersion.objects.create(
                             project=project,
                             version_number=version_number,
                             description=description,
                             action=action,
-                            created_by=user
+                            created_by=user,
+                            is_latest=True
                         )
                         version.create_files_snapshot()
                         return version
@@ -317,6 +327,98 @@ def upload_file(request, project_id):
     return render(request, 'accounts/upload_file.html', {'project': project})
 
 @login_required
+def upload_version(request, project_id):
+    """Upload a new version for a project"""
+    from django.conf import settings
+    
+    project = get_object_or_404(Project, id=project_id)
+    
+    # Check if user has permission to upload versions
+    if project.owner != request.user and request.user not in project.shared_with.all():
+        messages.error(request, 'You do not have permission to upload versions to this project.')
+        return redirect('project_detail', project_id=project.id)
+    
+    # Get next version number
+    next_version = project.get_next_version_number()
+    
+    if request.method == 'POST':
+        version_number = request.POST.get('version_number', '').strip()
+        description = request.POST.get('description', '').strip()
+        is_latest = request.POST.get('is_latest') == 'on'
+        version_file = request.FILES.get('version_file')
+        
+        # Validation
+        if not version_number:
+            messages.error(request, 'Version number is required.')
+            return redirect('upload_version', project_id=project.id)
+        
+        if not version_file:
+            messages.error(request, 'Please select a file to upload.')
+            return redirect('upload_version', project_id=project.id)
+        
+        # Check if version number already exists
+        if ProjectVersion.objects.filter(project=project, version_number=version_number).exists():
+            messages.error(request, f'Version {version_number} already exists. Please use a different version number.')
+            return redirect('upload_version', project_id=project.id)
+        
+        # Validation constants
+        MAX_FILE_SIZE = getattr(settings, 'MAX_FILE_SIZE', 50 * 1024 * 1024)  # 50MB
+        BLOCKED_EXTENSIONS = getattr(settings, 'BLOCKED_FILE_EXTENSIONS', 
+            ['.exe', '.bat', '.sh', '.cmd', '.com', '.app', '.dmg', '.deb', '.rpm'])
+        
+        file_size = version_file.size
+        file_extension = os.path.splitext(version_file.name)[1].lower()
+        
+        # Security check - block dangerous file types
+        if file_extension in BLOCKED_EXTENSIONS:
+            messages.error(request, f'File type {file_extension} is not allowed for security reasons.')
+            return redirect('upload_version', project_id=project.id)
+        
+        # File size check
+        if file_size > MAX_FILE_SIZE:
+            size_mb = file_size / (1024 * 1024)
+            messages.error(request, f'File size ({size_mb:.1f}MB) exceeds the maximum allowed size of 50MB.')
+            return redirect('upload_version', project_id=project.id)
+        
+        try:
+            # If marking as latest, unmark all other versions
+            if is_latest:
+                ProjectVersion.objects.filter(project=project).update(is_latest=False)
+            
+            # Create the version
+            version = ProjectVersion.objects.create(
+                project=project,
+                version_number=version_number,
+                description=description if description else f'Version {version_number}',
+                created_by=request.user,
+                version_file=version_file,
+                file_size=file_size,
+                file_type=file_extension[1:] if file_extension else 'unknown',
+                is_latest=is_latest,
+                action='manual'
+            )
+            
+            # Create files snapshot
+            version.create_files_snapshot()
+            
+            # Update project timestamp
+            project.save()
+            
+            messages.success(request, f'✅ Version {version_number} uploaded successfully!')
+            return redirect('project_detail', project_id=project.id)
+            
+        except Exception as e:
+            messages.error(request, f'Failed to upload version: {str(e)}')
+            return redirect('upload_version', project_id=project.id)
+    
+    context = {
+        'project': project,
+        'next_version': next_version,
+    }
+    
+    return render(request, 'accounts/upload_version.html', context)
+
+@login_required
 def my_projects(request):
     """List user's projects"""
     projects = Project.objects.filter(owner=request.user).order_by('-created_at')
@@ -555,29 +657,28 @@ def view_shared_project(request, share_uuid):
 # UPLOAD FOLDER
 @login_required
 def upload_folder(request):
-    """Create a new project and upload multiple files (simulate folder upload)"""
+    """Upload a folder from device and create a new project preserving folder structure"""
     if request.method == 'POST':
-        folder_name = request.POST.get('folder_name', '').strip()
-        is_public = request.POST.get('is_public') == 'on'
         files = request.FILES.getlist('files')
-        
-        if not folder_name:
-            messages.error(request, 'Please provide a folder name.')
-            return redirect('home')
+        is_public = request.POST.get('is_public') == 'on'
         
         if not files:
-            messages.error(request, 'Please select at least one file.')
+            messages.error(request, 'Please select a folder to upload.')
             return redirect('home')
         
-        # Create new project (folder)
+        # Get folder name from first file's path
+        first_file = files[0]
+        folder_name = first_file.name.split('/')[0] if '/' in first_file.name else 'Uploaded Folder'
+        
+        # Create new project
         project = Project.objects.create(
             title=folder_name,
-            description=f'Folder containing {len(files)} file(s)',
+            description=f'Folder uploaded from device containing {len(files)} file(s)',
             owner=request.user,
             is_public=is_public
         )
         
-        # Upload all files to the project
+        # Upload all files with folder structure preserved
         from django.conf import settings
         MAX_FILE_SIZE = getattr(settings, 'MAX_FILE_SIZE', 50 * 1024 * 1024)
         BLOCKED_EXTENSIONS = getattr(settings, 'BLOCKED_FILE_EXTENSIONS', 
@@ -587,6 +688,7 @@ def upload_folder(request):
         failed_uploads = []
         
         for file in files:
+            # Preserve the relative path
             file_name = file.name
             file_size = file.size
             file_extension = os.path.splitext(file_name)[1].lower()
@@ -603,20 +705,29 @@ def upload_folder(request):
             try:
                 file_type = file_extension[1:] if file_extension else 'unknown'
                 
+                # Store with relative path preserved
                 ProjectFile.objects.create(
                     project=project,
-                    name=file_name,
+                    name=file_name,  # This includes the folder path
                     file=file,
                     file_type=file_type,
                     size=file_size
                 )
                 successful_uploads += 1
             except Exception as e:
-                failed_uploads.append(f'{file_name} (upload error)')
+                failed_uploads.append(f'{file_name} (upload error: {str(e)})')
+        
+        # Create initial version
+        create_project_version(
+            project=project,
+            user=request.user,
+            action='created',
+            description=f'Folder "{folder_name}" uploaded with {successful_uploads} file(s)'
+        )
         
         # Show results
         if successful_uploads > 0:
-            messages.success(request, f'✅ Folder "{folder_name}" created with {successful_uploads} file(s)!')
+            messages.success(request, f'✅ Folder "{folder_name}" uploaded with {successful_uploads} file(s)!')
         
         if failed_uploads:
             messages.warning(request, f'⚠️ {len(failed_uploads)} file(s) failed: {", ".join(failed_uploads[:3])}')

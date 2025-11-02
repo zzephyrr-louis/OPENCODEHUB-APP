@@ -56,4 +56,7 @@ urlpatterns = [
     path('projects/<int:project_id>/restore/', views.restore_from_trash, name='restore_from_trash'),
     path('projects/<int:project_id>/delete-permanently/', views.delete_permanently, name='delete_permanently'),
     path('trash/empty/', views.empty_trash, name='empty_trash'),
+
+    # Upload Project Version
+    path('projects/<int:project_id>/upload-version/', views.upload_version, name='upload_version'),
 ]

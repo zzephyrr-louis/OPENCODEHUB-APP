@@ -39,8 +39,8 @@
                 <span class="badge bg-primary" style="border-radius: 10px; font-size: 1rem;">
                     {{ version.version_number }}
                 </span>
-                {% if forloop.first %}
-                <span class="badge bg-success" style="border-radius: 10px; font-size: 1rem;">
+                {% if version.is_latest %}
+                <span class="badge bg-success">
                     <i class="fas fa-star"></i> LATEST
                 </span>
                 {% endif %}
