@@ -15,6 +15,25 @@ from django.db import transaction
 import time
 import os
 
+# Optional imports for file processing (with error handling)
+try:
+    import mammoth
+    MAMMOTH_AVAILABLE = True
+except ImportError:
+    MAMMOTH_AVAILABLE = False
+
+try:
+    from docx import Document
+    PYTHON_DOCX_AVAILABLE = True
+except ImportError:
+    PYTHON_DOCX_AVAILABLE = False
+
+try:
+    import openpyxl
+    OPENPYXL_AVAILABLE = True
+except ImportError:
+    OPENPYXL_AVAILABLE = False
+
 # Helper function to create version
 def create_project_version(project, user, action='manual', description=''):
     """Create a new version snapshot for a project"""
@@ -869,20 +888,27 @@ def delete_file(request, project_id, file_id):
     if request.method == 'POST':
         file_name = file.name
         
-        # Delete the physical file
-        if file.file:
-            file.file.delete()
+        # Delete the physical file with error handling
+        try:
+            if file.file:
+                file.file.delete()
+        except Exception as e:
+            messages.warning(request, f'Warning: Could not delete physical file: {str(e)}')
         
         # Delete the database record
-        file.delete()
-        
-        # Create version for file deletion
-        create_project_version(
-            project=project,
-            user=request.user,
-            action='file_deleted',
-            description=f'Deleted file: {file_name}'
-        )
+        try:
+            file.delete()
+            
+            # Create version for file deletion
+            create_project_version(
+                project=project,
+                user=request.user,
+                action='file_deleted',
+                description=f'Deleted file: {file_name}'
+            )
+        except Exception as e:
+            messages.error(request, f'Failed to delete file from database: {str(e)}')
+            return redirect('project_detail', project_id=project.id)
         
         messages.success(request, f'File "{file_name}" deleted successfully!')
         return redirect('project_detail', project_id=project.id)
@@ -947,40 +973,46 @@ def view_edit_file(request, project_id, file_id):
     
     elif file_extension in WORD_EXTENSIONS:
         file_type = 'word'
-        is_editable = True
-        try:
-            import mammoth
-            with file.file.open('rb') as docx_file:
-                result = mammoth.convert_to_html(docx_file)
-                file_content = result.value
-        except Exception as e:
-            messages.error(request, f'Could not read Word file: {str(e)}')
+        if not MAMMOTH_AVAILABLE:
+            messages.error(request, 'Word file processing is not available. Please install mammoth library.')
             is_editable = False
+        else:
+            is_editable = True
+            try:
+                with file.file.open('rb') as docx_file:
+                    result = mammoth.convert_to_html(docx_file)
+                    file_content = result.value
+            except Exception as e:
+                messages.error(request, f'Could not read Word file: {str(e)}')
+                is_editable = False
     
     elif file_extension in EXCEL_EXTENSIONS:
         file_type = 'excel'
-        is_editable = True
-        try:
-            import openpyxl
-            wb = openpyxl.load_workbook(file.file.path)
-            sheet = wb.active
-            
-            # Convert to list of lists
-            excel_data = {
-                'headers': [],
-                'rows': []
-            }
-            
-            for i, row in enumerate(sheet.iter_rows(values_only=True)):
-                if i == 0:
-                    excel_data['headers'] = list(row)
-                else:
-                    excel_data['rows'].append(list(row))
-            
-            wb.close()
-        except Exception as e:
-            messages.error(request, f'Could not read Excel file: {str(e)}')
+        if not OPENPYXL_AVAILABLE:
+            messages.error(request, 'Excel file processing is not available. Please install openpyxl library.')
             is_editable = False
+        else:
+            is_editable = True
+            try:
+                wb = openpyxl.load_workbook(file.file.path)
+                sheet = wb.active
+                
+                # Convert to list of lists
+                excel_data = {
+                    'headers': [],
+                    'rows': []
+                }
+                
+                for i, row in enumerate(sheet.iter_rows(values_only=True)):
+                    if i == 0:
+                        excel_data['headers'] = list(row)
+                    else:
+                        excel_data['rows'].append(list(row))
+                
+                wb.close()
+            except Exception as e:
+                messages.error(request, f'Could not read Excel file: {str(e)}')
+                is_editable = False
     
     # Handle file save (POST request)
     if request.method == 'POST' and is_editable:
@@ -1003,7 +1035,10 @@ def view_edit_file(request, project_id, file_id):
             
             elif file_type == 'word':
                 # Save Word file
-                from docx import Document
+                if not PYTHON_DOCX_AVAILABLE:
+                    messages.error(request, 'Word file editing is not available. Please install python-docx library.')
+                    return redirect('view_edit_file', project_id=project.id, file_id=file.id)
+                
                 import io
                 
                 new_content = request.POST.get('content', '')
@@ -1038,7 +1073,10 @@ def view_edit_file(request, project_id, file_id):
             
             elif file_type == 'excel':
                 # Save Excel file
-                import openpyxl
+                if not OPENPYXL_AVAILABLE:
+                    messages.error(request, 'Excel file editing is not available. Please install openpyxl library.')
+                    return redirect('view_edit_file', project_id=project.id, file_id=file.id)
+                
                 import json
                 
                 # Get JSON data from form
@@ -1207,3 +1245,75 @@ def empty_trash(request):
         return redirect('trash')
     
     return redirect('trash')
+
+
+# USER PROFILE
+@login_required
+def profile(request, username=None):
+    """View user profile with upload statistics"""
+    if username:
+        # View another user's profile
+        profile_user = get_object_or_404(User, username=username)
+    else:
+        # View own profile
+        profile_user = request.user
+    
+    # Get total uploads count
+    total_uploads = profile_user.get_total_uploads()
+    formatted_count = User.format_upload_count(total_uploads)
+    
+    # Get user's public projects
+    public_projects = Project.objects.filter(
+        owner=profile_user,
+        is_public=True,
+        is_deleted=False
+    ).order_by('-updated_at')[:6]
+    
+    # Get statistics
+    total_projects = profile_user.projects.filter(is_deleted=False).count()
+    total_versions = ProjectVersion.objects.filter(created_by=profile_user).count()
+    
+    context = {
+        'profile_user': profile_user,
+        'total_uploads': total_uploads,
+        'formatted_upload_count': formatted_count,
+        'total_projects': total_projects,
+        'total_versions': total_versions,
+        'public_projects': public_projects,
+        'is_own_profile': profile_user == request.user,
+    }
+    
+    return render(request, 'accounts/profile.html', context)
+
+
+# UPDATE PROFILE
+@login_required
+def update_profile(request):
+    """Update user profile information"""
+    if request.method == 'POST':
+        user = request.user
+        
+        # Update basic info
+        user.first_name = request.POST.get('first_name', '').strip()
+        user.last_name = request.POST.get('last_name', '').strip()
+        user.bio = request.POST.get('bio', '').strip()
+        
+        # Handle profile picture upload
+        if 'profile_picture' in request.FILES:
+            # Delete old profile picture if exists
+            if user.profile_picture:
+                user.profile_picture.delete()
+            
+            user.profile_picture = request.FILES['profile_picture']
+        
+        # Handle profile picture removal
+        if request.POST.get('remove_picture') == 'true':
+            if user.profile_picture:
+                user.profile_picture.delete()
+                user.profile_picture = None
+        
+        user.save()
+        messages.success(request, 'Profile updated successfully!')
+        return redirect('profile')
+    
+    return redirect('profile')

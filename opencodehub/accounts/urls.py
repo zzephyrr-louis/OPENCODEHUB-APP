@@ -59,4 +59,9 @@ urlpatterns = [
 
     # Upload Project Version
     path('projects/<int:project_id>/upload-version/', views.upload_version, name='upload_version'),
+    
+    # User Profile
+    path('profile/', views.profile, name='profile'),
+    path('profile/<str:username>/', views.profile, name='user_profile'),
+    path('profile/update/', views.update_profile, name='update_profile'),
 ]

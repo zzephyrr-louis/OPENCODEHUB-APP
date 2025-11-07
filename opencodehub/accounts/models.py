@@ -15,6 +15,32 @@ class User(AbstractUser):
     security_question = models.CharField(max_length=200, blank=True, default='')
     security_answer = models.CharField(max_length=200, blank=True, default='')
 
+    def get_profile_picture_url(self):
+        """Return profile picture URL or default if none uploaded"""
+        if self.profile_picture:
+            return self.profile_picture.url
+        return '/static/accounts/images/default-profile.svg'
+
+    def get_total_uploads(self):
+        """Count total number of uploads (projects + versions) by this user"""
+        # Count projects created by user
+        projects_count = self.projects.filter(is_deleted=False).count()
+
+        # Count versions created by user across all projects
+        versions_count = ProjectVersion.objects.filter(created_by=self).count()
+
+        return projects_count + versions_count
+
+    @staticmethod
+    def format_upload_count(count):
+        """Format upload count for readability (e.g., 1.2k, 2M)"""
+        if count >= 1_000_000:
+            return f"{count / 1_000_000:.1f}M"
+        elif count >= 1_000:
+            return f"{count / 1_000:.1f}k"
+        else:
+            return str(count)
+
 
 class Project(models.Model):
     """Model for user projects"""
@@ -100,8 +126,6 @@ class ProjectVersion(models.Model):
         if not self.pk and not ProjectVersion.objects.filter(project=self.project).exists():
             self.is_latest = True
         super().save(*args, **kwargs)
-
-        return f"{self.project.title} {self.version_number}"
     
     def get_action_display_with_icon(self):
         """Get display text for action"""

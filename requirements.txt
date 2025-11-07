@@ -20,3 +20,8 @@ sqlparse==0.5.3
 typing_extensions==4.15.0
 tzdata==2025.2
 whitenoise==6.11.0
+
+# Note: All required dependencies are already included
+# mammoth - for Word document processing
+# openpyxl - for Excel file processing  
+# python-docx - for Word document creation/editing

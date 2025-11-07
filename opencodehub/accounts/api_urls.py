@@ -4,7 +4,9 @@ from .api_views import (
     ProjectViewSet,
     ProjectVersionViewSet,
     ProjectVersionListView,
-    LatestVersionView
+    LatestVersionView,
+    user_profile_api,
+    current_user_api
 )
 
 # Create a router for viewsets
@@ -45,4 +47,13 @@ api_urlpatterns = [
     path('projects/<int:project_id>/versions/<int:pk>/download/', 
          ProjectVersionViewSet.as_view({'get': 'download'}), 
          name='api-project-version-download'),
+    
+    # User profile endpoints
+    path('users/me/', 
+         current_user_api, 
+         name='api-current-user'),
+    
+    path('users/<str:username>/', 
+         user_profile_api, 
+         name='api-user-profile'),
 ]
