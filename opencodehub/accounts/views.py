@@ -850,7 +850,13 @@ def restore_version(request, project_id, version_id):
 def delete_file(request, project_id, file_id):
     """Delete a file from project"""
     project = get_object_or_404(Project, id=project_id)
-    file = get_object_or_404(ProjectFile, id=file_id, project=project)
+    
+    # Try to get the file, handle if it doesn't exist
+    try:
+        file = ProjectFile.objects.get(id=file_id, project=project)
+    except ProjectFile.DoesNotExist:
+        messages.error(request, 'This file no longer exists.')
+        return redirect('project_detail', project_id=project.id)
     
     # Check permissions
     can_delete = False
@@ -869,27 +875,33 @@ def delete_file(request, project_id, file_id):
     if request.method == 'POST':
         file_name = file.name
         
-        # Delete the physical file
-        if file.file:
-            file.file.delete()
+        # Delete the physical file if it exists
+        try:
+            if file.file:
+                file.file.delete(save=False)
+        except Exception as e:
+            print(f"⚠️ Could not delete physical file: {str(e)}")
+            # Continue anyway to delete database record
         
         # Delete the database record
         file.delete()
         
         # Create version for file deletion
-        create_project_version(
-            project=project,
-            user=request.user,
-            action='file_deleted',
-            description=f'Deleted file: {file_name}'
-        )
+        try:
+            create_project_version(
+                project=project,
+                user=request.user,
+                action='file_deleted',
+                description=f'Deleted file: {file_name}'
+            )
+        except Exception as e:
+            print(f"⚠️ Could not create version: {str(e)}")
         
         messages.success(request, f'File "{file_name}" deleted successfully!')
         return redirect('project_detail', project_id=project.id)
     
-    # if GET request, show confirmation modal 
+    # if GET request, redirect back to project
     return redirect('project_detail', project_id=project.id)
-
 
 # TOGGLE DELETE PERMISSION
 @login_required
@@ -944,9 +956,10 @@ def view_edit_file(request, project_id, file_id):
         file_content = ''
         
         try:
-            # Read file into memory
-            file.file.seek(0)
+            # Open and read file properly
+            file.file.open('rb')
             file_bytes = file.file.read()
+            file.file.close()
             file_content = file_bytes.decode('utf-8', errors='ignore')
             print(f"✅ Text file loaded: {len(file_content)} chars")
             
@@ -965,9 +978,10 @@ def view_edit_file(request, project_id, file_id):
         try:
             import mammoth
             
-            # Read file into memory
-            file.file.seek(0)
+            # Open and read file properly
+            file.file.open('rb')
             file_bytes = file.file.read()
+            file.file.close()
             file_stream = BytesIO(file_bytes)
             
             result = mammoth.convert_to_html(file_stream)
@@ -993,43 +1007,126 @@ def view_edit_file(request, project_id, file_id):
         
         try:
             import openpyxl
+            from openpyxl.utils.exceptions import InvalidFileException
             
-            # Read file into memory
+            # Reset file pointer and read
             file.file.seek(0)
             file_bytes = file.file.read()
+            print(f"📊 Excel file size: {len(file_bytes)} bytes")
+            
+            if len(file_bytes) == 0:
+                raise Exception("File is empty (0 bytes)")
+            
+            # Create BytesIO stream
             file_stream = BytesIO(file_bytes)
             
+            # Load workbook - data_only=True converts formulas to their calculated values
             wb = openpyxl.load_workbook(file_stream, data_only=True)
             sheet = wb.active
             
-            # Convert to list of lists
-            for i, row in enumerate(sheet.iter_rows(values_only=True)):
-                if i == 0:
-                    excel_data['headers'] = [str(cell) if cell is not None else '' for cell in row]
-                else:
-                    excel_data['rows'].append([str(cell) if cell is not None else '' for cell in row])
+            print(f"📊 Sheet: '{sheet.title}' | Max row: {sheet.max_row} | Max col: {sheet.max_column}")
+            
+            # Read all data with proper handling
+            all_rows = []
+            
+            for row_idx in range(1, sheet.max_row + 1):
+                row_data = []
+                for col_idx in range(1, sheet.max_column + 1):
+                    cell = sheet.cell(row=row_idx, column=col_idx)
+                    
+                    # Get cell value, handling different types
+                    cell_value = cell.value
+                    
+                    # Convert to string, handling None, numbers, dates, etc.
+                    if cell_value is None:
+                        str_value = ''
+                    elif isinstance(cell_value, (int, float)):
+                        # Format numbers nicely (remove .0 for whole numbers)
+                        if isinstance(cell_value, float) and cell_value.is_integer():
+                            str_value = str(int(cell_value))
+                        else:
+                            str_value = str(cell_value)
+                    else:
+                        str_value = str(cell_value)
+                    
+                    row_data.append(str_value)
+                
+                # Only add row if it has at least one non-empty cell
+                if any(cell.strip() for cell in row_data):
+                    all_rows.append(row_data)
             
             wb.close()
-            print(f"✅ Excel file loaded: {len(excel_data['rows'])} rows")
+            
+            print(f"📊 Read {len(all_rows)} rows")
+            
+            # Process the data
+            if len(all_rows) > 0:
+                # First row as headers
+                excel_data['headers'] = all_rows[0]
+                
+                print(f"📊 Headers: {excel_data['headers']}")
+                
+                # Ensure headers are not empty
+                for i, header in enumerate(excel_data['headers']):
+                    if not header.strip():
+                        excel_data['headers'][i] = f'Column {i+1}'
+                
+                # Rest as data rows
+                excel_data['rows'] = all_rows[1:] if len(all_rows) > 1 else []
+                
+                print(f"📊 Data rows: {excel_data['rows']}")
+                
+                # Ensure all rows have same number of columns as headers
+                num_cols = len(excel_data['headers'])
+                for row in excel_data['rows']:
+                    while len(row) < num_cols:
+                        row.append('')
+                    # Trim if row is longer
+                    if len(row) > num_cols:
+                        row[:] = row[:num_cols]
+                
+                # If no data rows, add at least 2 empty rows for editing
+                if len(excel_data['rows']) == 0:
+                    excel_data['rows'] = [[''] * num_cols for _ in range(2)]
+                
+                print(f"✅ Excel loaded: {len(excel_data['headers'])} columns × {len(excel_data['rows'])} rows")
+            else:
+                # Completely empty file - create default structure
+                print("⚠️ No data in Excel file, using defaults")
+                excel_data = {
+                    'headers': ['Column 1', 'Column 2', 'Column 3'],
+                    'rows': [['', '', ''], ['', '', '']]
+                }
             
         except ImportError:
-            print("⚠️ openpyxl library not installed")
-            messages.warning(request, 'Excel file support not available. Starting with empty spreadsheet.')
+            print("❌ openpyxl not installed")
+            messages.warning(request, '⚠️ Excel support requires openpyxl library. Please contact administrator.')
+            is_editable = False
             excel_data = {
                 'headers': ['Column 1', 'Column 2', 'Column 3'],
-                'rows': [['', '', ''], ['', '', '']]
+                'rows': [['Error: openpyxl not installed', '', '']]
+            }
+            
+        except InvalidFileException as e:
+            print(f"❌ Invalid Excel file: {str(e)}")
+            messages.error(request, '❌ This file appears to be corrupted or is not a valid Excel file.')
+            is_editable = False
+            excel_data = {
+                'headers': ['Error'],
+                'rows': [['This file could not be read. It may be corrupted.']]
             }
             
         except Exception as e:
-            print(f"⚠️ Excel file error: {str(e)}")
+            print(f"❌ Excel error: {str(e)}")
             import traceback
             print(traceback.format_exc())
-            messages.warning(request, 'Could not read Excel file. Starting with empty spreadsheet.')
+            messages.error(request, f'❌ Error reading Excel file: {str(e)}')
+            is_editable = False
             excel_data = {
-                'headers': ['Column 1', 'Column 2', 'Column 3'],
-                'rows': [['', '', ''], ['', '', '']]
+                'headers': ['Error'],
+                'rows': [[f'Could not load file: {str(e)}']]
             }
-    
+
     # Handle file save (POST request)
     if request.method == 'POST' and is_editable:
         # Check if user can edit
@@ -1078,8 +1175,9 @@ def view_edit_file(request, project_id, file_id):
                 
                 # Re-read for display
                 import mammoth
-                file.file.seek(0)
+                file.file.open('rb')
                 file_bytes = file.file.read()
+                file.file.close()
                 file_stream = BytesIO(file_bytes)
                 result = mammoth.convert_to_html(file_stream)
                 file_content = result.value
@@ -1116,8 +1214,9 @@ def view_edit_file(request, project_id, file_id):
                 file.save()
                 
                 # Re-read for display
-                file.file.seek(0)
+                file.file.open('rb')
                 file_bytes = file.file.read()
+                file.file.close()
                 file_stream = BytesIO(file_bytes)
                 wb = openpyxl.load_workbook(file_stream, data_only=True)
                 sheet = wb.active

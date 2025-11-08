@@ -131,10 +131,16 @@
         <div class="card-body p-0">
             <form method="POST" id="editFileForm">
             {% csrf_token %}
+            
+            <!-- Added row/column count display -->
             <div class="editor-header" style="background: #217346; padding: 1rem 1.5rem; border-bottom: 1px solid #dee2e6; border-radius: 15px 15px 0 0;">
                 <div class="d-flex justify-content-between align-items-center">
                 <h5 class="mb-0" style="color: white;">
                     <i class="fas fa-file-excel"></i> Excel Spreadsheet Editor
+                    <!-- Shows dimensions of spreadsheet -->
+                    <small style="opacity: 0.8; font-size: 0.85rem; margin-left: 1rem;">
+                        {{ excel_data.headers|length }} columns × {{ excel_data.rows|length }} rows
+                    </small>
                 </h5>
                 {% if can_edit %}
                 <div class="btn-group" role="group">
@@ -155,38 +161,67 @@
                 </div>
             </div>
             
-            <div class="table-responsive p-3" style="background: white; border-radius: 0 0 15px 15px;">
-                <table class="table table-bordered" id="excelTable">
-                <thead class="table-light">
+            <!-- Added max-height, better overflow handling, and scrollable container -->
+            <div class="table-responsive p-3" style="background: white; border-radius: 0 0 15px 15px; max-height: 600px; overflow: auto;">
+                <!-- Check if headers exist before displaying table -->
+                {% if excel_data.headers %}
+                <table class="table table-bordered" id="excelTable" style="margin-bottom: 0;">
+                <!-- Made headers sticky so they stay visible when scrolling -->
+                <thead class="table-light" style="position: sticky; top: 0; z-index: 10;">
                     <tr id="headerRow">
                     {% for header in excel_data.headers %}
-                    <th contenteditable="{% if can_edit %}true{% else %}false{% endif %}" class="excel-cell">{{ header }}</th>
+                    <!-- Added min-width to prevent cramped columns -->
+                    <th contenteditable="{% if can_edit %}true{% else %}false{% endif %}" class="excel-cell" style="min-width: 150px;">{{ header }}</th>
                     {% endfor %}
+                    <!-- Empty header cell for delete button column -->
+                    {% if can_edit %}
+                    <th style="width: 50px; background: #f8f9fa;"></th>
+                    {% endif %}
                     </tr>
                 </thead>
                 <tbody id="excelBody">
-                    {% for row in excel_data.rows %}
-                    <tr>
-                    {% for cell in row %}
-                    <td contenteditable="{% if can_edit %}true{% else %}false{% endif %}" class="excel-cell">{{ cell }}</td>
-                    {% endfor %}
-                    {% if can_edit %}
-                    <td class="text-center" style="background: #f8f9fa;">
-                        <button type="button" class="btn btn-sm btn-danger" onclick="deleteRow(this)">
-                        <i class="fas fa-times"></i>
-                        </button>
-                    </td>
+                    <!-- Check if rows exist -->
+                    {% if excel_data.rows %}
+                        {% for row in excel_data.rows %}
+                        <tr>
+                        {% for cell in row %}
+                        <td contenteditable="{% if can_edit %}true{% else %}false{% endif %}" class="excel-cell">{{ cell }}</td>
+                        {% endfor %}
+                        {% if can_edit %}
+                        <!-- Better vertical alignment for delete button -->
+                        <td class="text-center" style="background: #f8f9fa; vertical-align: middle;">
+                            <button type="button" class="btn btn-sm btn-danger" onclick="deleteRow(this)">
+                            <i class="fas fa-times"></i>
+                            </button>
+                        </td>
+                        {% endif %}
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <!-- Message when no data rows exist -->
+                        <tr>
+                            <td colspan="{{ excel_data.headers|length }}" class="text-center text-muted py-4">
+                                <i class="fas fa-table"></i> No data rows. Click "Add Row" to start adding data.
+                            </td>
+                        </tr>
                     {% endif %}
-                    </tr>
-                    {% endfor %}
                 </tbody>
                 </table>
+                {% else %}
+                <!-- Warning message if file couldn't be read -->
+                <div class="alert alert-warning m-3">
+                    <i class="fas fa-exclamation-triangle"></i> 
+                    <strong>No data found in this Excel file.</strong>
+                    The file may be empty or could not be read properly.
+                </div>
+                {% endif %}
             </div>
             
             <input type="hidden" name="excel_data" id="excelData">
             </form>
         </div>
         </div>
+        <!-- END EXCEL EDITOR -->
         {% endif %}
         
         {% if can_edit %}
@@ -209,9 +244,9 @@
         </div>
     </div>
     {% endif %}
-    </div>
+</div>
 
-    <style>
+<style>
     .cs-button-6 {
         display: inline-flex;
         align-items: center;
@@ -260,59 +295,98 @@
         line-height: 1.6;
     }
 
+    /* EXCEL CELL STYLES */
     .excel-cell {
-        min-width: 100px;
-        padding: 8px;
+        min-width: 120px;           // Increased from 100px 
+        max-width: 300px;           // Prevents cells from being too wide
+        padding: 8px 12px;          // Better padding 
+        white-space: pre-wrap;      // Preserves line breaks 
+        word-wrap: break-word;      // Breaks long words 
+        vertical-align: top;        // Aligns content to top 
     }
 
     .excel-cell:focus {
         background: #e3f2fd;
         outline: 2px solid #2196f3;
+        outline-offset: -2px;       // Keeps outline inside cell 
     }
 
     #excelTable {
         margin-bottom: 0;
+        font-size: 14px;            // Consistent font size
     }
-    </style>
 
-    <script>
-    {% if file_type == 'text' %}
-    const originalContent = `{{ file_content|escapejs }}`;
+    // Better header styling
+    #excelTable thead th {
+        background: #f8f9fa;
+        font-weight: 600;
+        border-bottom: 2px solid #dee2e6;
+    }
 
-    function resetContent() {
+    // Sticky header for scrolling
+    .table-responsive {
+        position: relative;
+    }
+
+    // Better scrollbar styling 
+    .table-responsive::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    .table-responsive::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+
+    .table-responsive::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 5px;
+    }
+
+    .table-responsive::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+</style>
+
+<script>
+{% if file_type == 'text' %}
+const originalContent = `{{ file_content|escapejs }}`;
+
+function resetContent() {
     if (confirm('Are you sure you want to reset all changes?')) {
         document.getElementById('fileContent').value = originalContent;
     }
-    }
-    {% endif %}
+}
+{% endif %}
 
-    {% if file_type == 'word' %}
-    const originalWordContent = `{{ file_content|escapejs }}`;
+{% if file_type == 'word' %}
+const originalWordContent = `{{ file_content|escapejs }}`;
 
-    function resetContent() {
+function resetContent() {
     if (confirm('Are you sure you want to reset all changes?')) {
         document.getElementById('wordEditor').innerHTML = originalWordContent;
     }
-    }
+}
 
-    // Capture Word editor content before submit
-    document.getElementById('editFileForm').addEventListener('submit', function(e) {
+// Capture Word editor content before submit
+document.getElementById('editFileForm').addEventListener('submit', function(e) {
     const editorContent = document.getElementById('wordEditor').innerHTML;
     document.getElementById('wordContent').value = editorContent;
     
     const submitBtn = this.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-    });
-    {% endif %}
+});
+{% endif %}
 
-    {% if file_type == 'excel' %}
-    const originalExcelData = {{ excel_data|safe|escapejs }};
+{% if file_type == 'excel' %}
+// Excel data as JSON
+const originalExcelData = {{ excel_data|safe }};
 
-    function addRow() {
+function addRow() { 
     const tbody = document.getElementById('excelBody');
     const headerRow = document.getElementById('headerRow');
-    const colCount = headerRow.cells.length;
+    const colCount = headerRow.querySelectorAll('.excel-cell').length;
     
     const newRow = tbody.insertRow();
     for (let i = 0; i < colCount; i++) {
@@ -327,43 +401,59 @@
     deleteCell.className = 'text-center';
     deleteCell.style.background = '#f8f9fa';
     deleteCell.innerHTML = '<button type="button" class="btn btn-sm btn-danger" onclick="deleteRow(this)"><i class="fas fa-times"></i></button>';
-    }
+}
 
-    function addColumn() {
+function addColumn() {
     const table = document.getElementById('excelTable');
     const headerRow = document.getElementById('headerRow');
     
-    // Add header
+    const currentCols = headerRow.querySelectorAll('.excel-cell').length;
+    const newColNum = currentCols + 1;
+    
     const th = document.createElement('th');
     th.contentEditable = 'true';
     th.className = 'excel-cell';
-    th.textContent = 'New Column';
-    headerRow.insertBefore(th, headerRow.lastElementChild);
+    th.style.minWidth = '150px';
+    th.textContent = `Column ${newColNum}`;
     
-    // Add cells to each row
+    const lastHeaderCell = headerRow.lastElementChild;
+    if (lastHeaderCell && !lastHeaderCell.classList.contains('excel-cell')) {
+        headerRow.insertBefore(th, lastHeaderCell);
+    } else {
+        headerRow.appendChild(th);
+    }
+    
     const rows = document.getElementById('excelBody').rows;
     for (let row of rows) {
-        const cell = row.insertCell(row.cells.length - 1);
+        const deleteButtonCell = row.querySelector('td[style*="background: #f8f9fa"]');
+        
+        const cell = document.createElement('td');
         cell.contentEditable = 'true';
         cell.className = 'excel-cell';
         cell.textContent = '';
+        
+        if (deleteButtonCell) {
+            row.insertBefore(cell, deleteButtonCell);
+        } else {
+            row.appendChild(cell);
+        }
     }
-    }
+}
 
-    function deleteRow(btn) {
+function deleteRow(btn) {
     if (confirm('Delete this row?')) {
         btn.closest('tr').remove();
     }
-    }
+}
 
-    function resetExcel() {
+function resetExcel() {
     if (confirm('Are you sure you want to reset all changes?')) {
         location.reload();
     }
-    }
+}
 
-    // Capture Excel data before submit
-    document.getElementById('editFileForm').addEventListener('submit', function(e) {
+// Capture Excel data before submit
+document.getElementById('editFileForm').addEventListener('submit', function(e) {
     const headers = [];
     const rows = [];
     
@@ -377,7 +467,9 @@
         const rowData = [];
         const cells = row.querySelectorAll('.excel-cell');
         cells.forEach(cell => rowData.push(cell.textContent.trim()));
-        rows.push(rowData);
+        if (rowData.length > 0) {
+            rows.push(rowData);
+        }
     });
     
     const excelData = {
@@ -388,9 +480,13 @@
     document.getElementById('excelData').value = JSON.stringify(excelData);
     
     const submitBtn = this.querySelector('button[type="submit"]');
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-    });
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    }
+});
+
+console.log('Excel editor initialized with', originalExcelData);
 {% endif %}
 </script>
 {% endblock %}
