@@ -869,7 +869,13 @@ def restore_version(request, project_id, version_id):
 def delete_file(request, project_id, file_id):
     """Delete a file from project"""
     project = get_object_or_404(Project, id=project_id)
-    file = get_object_or_404(ProjectFile, id=file_id, project=project)
+    
+    # Try to get the file, handle if it doesn't exist
+    try:
+        file = ProjectFile.objects.get(id=file_id, project=project)
+    except ProjectFile.DoesNotExist:
+        messages.error(request, 'This file no longer exists.')
+        return redirect('project_detail', project_id=project.id)
     
     # Check permissions
     can_delete = False
@@ -913,9 +919,8 @@ def delete_file(request, project_id, file_id):
         messages.success(request, f'File "{file_name}" deleted successfully!')
         return redirect('project_detail', project_id=project.id)
     
-    # if GET request, show confirmation modal 
+    # if GET request, redirect back to project
     return redirect('project_detail', project_id=project.id)
-
 
 # TOGGLE DELETE PERMISSION
 @login_required
