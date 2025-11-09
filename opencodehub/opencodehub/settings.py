@@ -20,11 +20,48 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-2r+hp@h)(uy0(9
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() == "true"
 
-# Allow local development hosts
-ALLOWED_HOSTS = [h.strip() for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") if h.strip()]
+# Allowed Hosts Configuration
+if DEBUG:
+    # Development: Allow local development
+    ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '.localhost', '0.0.0.0']
+else:
+    # Production: Use environment variable
+    ALLOWED_HOSTS = [
+        h.strip() for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") 
+        if h.strip()
+    ]
 
-# Add local development origins for CSRF protection
-CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "http://127.0.0.1:8000,http://localhost:8000,http://127.0.0.1:62287").split(",") if o.strip()]
+# CSRF Configuration - Cross-Site Request Forgery Protection
+# This ensures secure form submissions and prevents CSRF attacks
+CSRF_COOKIE_SECURE = not DEBUG  # Only require HTTPS cookies in production
+CSRF_COOKIE_SAMESITE = 'Lax'    # Allow cross-site requests with referrer
+CSRF_USE_SESSIONS = False        # Use cookies instead of sessions for CSRF tokens
+CSRF_COOKIE_HTTPONLY = False     # Allow JavaScript access to CSRF token
+
+# CSRF Trusted Origins - Domains allowed to make POST requests
+if DEBUG:
+    # Development: Allow local development and IDE browser previews
+    CSRF_TRUSTED_ORIGINS = [
+        "http://127.0.0.1:8000",   # Direct Django server
+        "http://localhost:8000",    # Localhost alias
+        "https://127.0.0.1:8000",  # HTTPS variant
+        "https://localhost:8000",   # HTTPS localhost
+    ]
+    # Add common development server ports (React, Vue, etc.)
+    for port in [3000, 3001, 8080, 8081, 9000, 9001]:
+        CSRF_TRUSTED_ORIGINS.extend([
+            f"http://127.0.0.1:{port}",
+            f"http://localhost:{port}",
+        ])
+    # Add IDE browser preview proxy ports (VS Code, WebStorm, etc.)
+    for port in range(49000, 65000, 518):
+        CSRF_TRUSTED_ORIGINS.append(f"http://127.0.0.1:{port}")
+else:
+    # Production: Use environment variable for security
+    CSRF_TRUSTED_ORIGINS = [
+        o.strip() for o in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") 
+        if o.strip()
+    ]
 
 # Application definition
 INSTALLED_APPS = [
@@ -164,12 +201,6 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10
 }
-
-# CSRF settings for development
-if DEBUG:
-    CSRF_COOKIE_SECURE = False
-    CSRF_COOKIE_SAMESITE = 'Lax'
-    CSRF_USE_SESSIONS = False
 
 # Security settings for production
 if os.environ.get("DJANGO_SECURE_SSL_REDIRECT", "False").lower() == "true":
