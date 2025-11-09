@@ -18,11 +18,13 @@ if os.environ.get("RENDER", "") != "true":
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-2r+hp@h)(uy0(9bz$w#59*)qn5)%-31#zh!b(w#^7jpr$++_ww")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
+DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() == "true"
 
-ALLOWED_HOSTS = [h.strip() for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if h.strip()]
+# Allow local development hosts
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") if h.strip()]
 
-CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
+# Add local development origins for CSRF protection
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "http://127.0.0.1:8000,http://localhost:8000,http://127.0.0.1:62287").split(",") if o.strip()]
 
 # Application definition
 INSTALLED_APPS = [
@@ -69,13 +71,23 @@ WSGI_APPLICATION = 'opencodehub.wsgi.application'
 
 # Database
 DATABASE_URL = os.environ.get("DATABASE_URL")
-DATABASES = {
-    "default": dj_database_url.config(
-        default=DATABASE_URL or "sqlite:///db.sqlite3",
-        conn_max_age=600,
-        ssl_require=True
-    )
-}
+if DATABASE_URL:
+    # Use PostgreSQL with SSL
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=True
+        )
+    }
+else:
+    # Use SQLite for local development (no SSL)
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 # Custom user model
 AUTH_USER_MODEL = 'accounts.User'
@@ -153,8 +165,14 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 10
 }
 
+# CSRF settings for development
+if DEBUG:
+    CSRF_COOKIE_SECURE = False
+    CSRF_COOKIE_SAMESITE = 'Lax'
+    CSRF_USE_SESSIONS = False
+
 # Security settings for production
-if os.environ.get("DJANGO_SECURE_SSL_REDIRECT", "True").lower() == "true":
+if os.environ.get("DJANGO_SECURE_SSL_REDIRECT", "False").lower() == "true":
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True

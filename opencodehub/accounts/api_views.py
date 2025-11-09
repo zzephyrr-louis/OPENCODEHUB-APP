@@ -1,5 +1,5 @@
 from rest_framework import viewsets, status, generics
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -11,13 +11,14 @@ from django.conf import settings
 import os
 import mimetypes
 
-from .models import Project, ProjectVersion, ProjectFile, Comment
+from .models import Project, ProjectVersion, ProjectFile, Comment, User
 from .serializers import (
     ProjectSerializer, 
     ProjectVersionSerializer, 
     ProjectVersionUploadSerializer,
     ProjectFileSerializer,
-    CommentSerializer
+    CommentSerializer,
+    UserSerializer
 )
 
 
@@ -177,21 +178,20 @@ class ProjectVersionViewSet(viewsets.ModelViewSet):
         if not version.version_file:
             raise Http404("Version file not found")
         
-        # Get file path
-        file_path = version.version_file.path
-        if not os.path.exists(file_path):
+        # Use Django's secure file handling instead of direct path access
+        try:
+            # Determine content type from file name
+            content_type, _ = mimetypes.guess_type(version.version_file.name)
+            if content_type is None:
+                content_type = 'application/octet-stream'
+            
+            # Create secure file response using Django's file handling
+            response = FileResponse(
+                version.version_file.open('rb'),
+                content_type=content_type
+            )
+        except (IOError, OSError):
             raise Http404("File not found on server")
-        
-        # Determine content type
-        content_type, _ = mimetypes.guess_type(file_path)
-        if content_type is None:
-            content_type = 'application/octet-stream'
-        
-        # Create response
-        response = FileResponse(
-            open(file_path, 'rb'),
-            content_type=content_type
-        )
         
         # Set download headers
         filename = f"{project.title}_v{version.version_number}{os.path.splitext(version.version_file.name)[1]}"
@@ -259,3 +259,29 @@ class LatestVersionView(generics.RetrieveAPIView):
             raise Http404("No versions found for this project")
         
         return latest_version
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_profile_api(request, username=None):
+    """
+    API endpoint to get user profile information with upload statistics
+    Implements Task 4.5.1 - Display total number of uploads
+    """
+    if username:
+        user = get_object_or_404(User, username=username)
+    else:
+        user = request.user
+    
+    serializer = UserSerializer(user, context={'request': request})
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def current_user_api(request):
+    """
+    API endpoint to get current authenticated user's profile
+    """
+    serializer = UserSerializer(request.user, context={'request': request})
+    return Response(serializer.data)

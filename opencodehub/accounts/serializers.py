@@ -6,10 +6,29 @@ from django.conf import settings
 
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for User model"""
+    profile_picture_url = serializers.SerializerMethodField()
+    total_uploads = serializers.SerializerMethodField()
+    formatted_upload_count = serializers.SerializerMethodField()
+    
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name']
-        read_only_fields = ['id']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 
+                  'profile_picture', 'profile_picture_url', 'bio', 
+                  'total_uploads', 'formatted_upload_count']
+        read_only_fields = ['id', 'total_uploads', 'formatted_upload_count']
+    
+    def get_profile_picture_url(self, obj):
+        """Get profile picture URL with fallback to default"""
+        return obj.get_profile_picture_url()
+    
+    def get_total_uploads(self, obj):
+        """Get total upload count for user"""
+        return obj.get_total_uploads()
+    
+    def get_formatted_upload_count(self, obj):
+        """Get formatted upload count (e.g., 1.2k, 2M)"""
+        count = obj.get_total_uploads()
+        return User.format_upload_count(count)
 
 
 class ProjectFileSerializer(serializers.ModelSerializer):
