@@ -970,8 +970,11 @@ def view_edit_file(request, project_id, file_id):
         file_type = 'text'
         is_editable = True
         try:
-            with file.file.open('r', encoding='utf-8', errors='ignore') as f:
-                file_content = f.read()
+            # Open and read file properly for cloud deployment
+            file.file.open('rb')
+            file_bytes = file.file.read()
+            file.file.close()
+            file_content = file_bytes.decode('utf-8', errors='ignore')
         except Exception as e:
             messages.error(request, f'Could not read file: {str(e)}')
             is_editable = False
@@ -984,12 +987,16 @@ def view_edit_file(request, project_id, file_id):
         else:
             is_editable = True
             try:
-                with file.file.open('rb') as docx_file:
-                    result = mammoth.convert_to_html(docx_file)
-                    file_content = result.value
+                # Open file properly for cloud deployment
+                file.file.open('rb')
+                result = mammoth.convert_to_html(file.file)
+                file_content = result.value
+                file.file.close()
             except Exception as e:
                 messages.error(request, f'Could not read Word file: {str(e)}')
                 is_editable = False
+                if hasattr(file.file, 'close'):
+                    file.file.close()
     
     elif file_extension in EXCEL_EXTENSIONS:
         file_type = 'excel'
