@@ -941,6 +941,8 @@ def toggle_delete_permission(request, project_id):
 @login_required
 def view_edit_file(request, project_id, file_id):
     """View and edit file content"""
+    from io import BytesIO
+    
     project = get_object_or_404(Project, id=project_id)
     file = get_object_or_404(ProjectFile, id=file_id, project=project)
     
@@ -960,75 +962,94 @@ def view_edit_file(request, project_id, file_id):
     EXCEL_EXTENSIONS = ['xlsx', 'xls']
     
     file_extension = file.file_type.lower()
-    file_type = 'text'  # Default
+    file_type = 'unknown'
     file_content = None
     excel_data = None
     is_editable = False
     
-    # Determine file type and read content
+    # TEXT FILES
     if file_extension in TEXT_EXTENSIONS:
         file_type = 'text'
         is_editable = True
+        file_content = ''
+        
         try:
-            # Open and read file properly for cloud deployment
             file.file.open('rb')
             file_bytes = file.file.read()
             file.file.close()
             file_content = file_bytes.decode('utf-8', errors='ignore')
+            print(f"✅ Text file loaded: {len(file_content)} chars")
         except Exception as e:
-            messages.error(request, f'Could not read file: {str(e)}')
-            is_editable = False
+            print(f"❌ Text error: {str(e)}")
+            messages.warning(request, 'Could not read text file. Starting with empty editor.')
     
+    # WORD FILES
     elif file_extension in WORD_EXTENSIONS:
         file_type = 'word'
+        is_editable = True
+        file_content = ''
+        
         if not MAMMOTH_AVAILABLE:
-            messages.error(request, 'Word file processing is not available. Please install mammoth library.')
-            is_editable = False
+            messages.error(request, 'Word file processing not available. Please install mammoth.')
+            file_content = '<p>Mammoth library not installed.</p>'
         else:
-            is_editable = True
             try:
-                # Open file properly for cloud deployment
                 file.file.open('rb')
-                result = mammoth.convert_to_html(file.file)
-                file_content = result.value
+                file_bytes = file.file.read()
                 file.file.close()
+                
+                file_stream = BytesIO(file_bytes)
+                result = mammoth.convert_to_html(file_stream)
+                file_content = result.value
+                
+                print(f"✅ Word file loaded: {len(file_content)} chars")
+                
             except Exception as e:
-                messages.error(request, f'Could not read Word file: {str(e)}')
-                is_editable = False
-                if hasattr(file.file, 'close'):
-                    file.file.close()
+                print(f"❌ Word error: {str(e)}")
+                import traceback
+                print(traceback.format_exc())
+                messages.warning(request, 'Could not read Word file. Starting with empty editor.')
+                file_content = '<p>Error loading document. You can start editing here.</p>'
     
+    # EXCEL FILES
     elif file_extension in EXCEL_EXTENSIONS:
         file_type = 'excel'
+        is_editable = True
+        excel_data = {'headers': [], 'rows': []}
+        
         if not OPENPYXL_AVAILABLE:
-            messages.error(request, 'Excel file processing is not available. Please install openpyxl library.')
-            is_editable = False
+            messages.error(request, 'Excel processing not available. Please install openpyxl.')
         else:
-            is_editable = True
             try:
-                wb = openpyxl.load_workbook(file.file.path)
-                sheet = wb.active
+                file.file.open('rb')
+                file_bytes = file.file.read()
+                file.file.close()
                 
-                # Convert to list of lists
-                excel_data = {
-                    'headers': [],
-                    'rows': []
-                }
+                file_stream = BytesIO(file_bytes)
+                wb = openpyxl.load_workbook(file_stream, data_only=True)
+                sheet = wb.active
                 
                 for i, row in enumerate(sheet.iter_rows(values_only=True)):
                     if i == 0:
-                        excel_data['headers'] = list(row)
+                        excel_data['headers'] = [str(cell) if cell is not None else '' for cell in row]
                     else:
-                        excel_data['rows'].append(list(row))
+                        excel_data['rows'].append([str(cell) if cell is not None else '' for cell in row])
                 
                 wb.close()
+                print(f"✅ Excel loaded: {len(excel_data['rows'])} rows")
+                
             except Exception as e:
-                messages.error(request, f'Could not read Excel file: {str(e)}')
-                is_editable = False
+                print(f"❌ Excel error: {str(e)}")
+                import traceback
+                print(traceback.format_exc())
+                messages.warning(request, 'Could not read Excel file. Starting with empty spreadsheet.')
+                excel_data = {
+                    'headers': ['Column 1', 'Column 2', 'Column 3'],
+                    'rows': [['', '', ''], ['', '', '']]
+                }
     
-    # Handle file save (POST request)
+    # Handle file save (POST)
     if request.method == 'POST' and is_editable:
-        # Check if user can edit
         can_edit = project.owner == request.user or request.user in project.shared_with.all()
         
         if not can_edit:
@@ -1037,7 +1058,6 @@ def view_edit_file(request, project_id, file_id):
         
         try:
             if file_type == 'text':
-                # Save text file
                 new_content = request.POST.get('content', '')
                 from django.core.files.base import ContentFile
                 file.file.save(file.name, ContentFile(new_content.encode('utf-8')), save=False)
@@ -1046,95 +1066,77 @@ def view_edit_file(request, project_id, file_id):
                 file_content = new_content
             
             elif file_type == 'word':
-                # Save Word file
                 if not PYTHON_DOCX_AVAILABLE:
-                    messages.error(request, 'Word file editing is not available. Please install python-docx library.')
+                    messages.error(request, 'Word editing not available. Please install python-docx.')
                     return redirect('view_edit_file', project_id=project.id, file_id=file.id)
                 
-                import io
-                
                 new_content = request.POST.get('content', '')
-                
-                # Create new document
                 doc = Document()
                 
-                # Parse HTML content and add to document (simple conversion)
-                # Remove HTML tags for plain text
                 import re
                 clean_text = re.sub('<[^<]+?>', '', new_content)
-                
                 for paragraph in clean_text.split('\n'):
                     if paragraph.strip():
                         doc.add_paragraph(paragraph)
                 
-                # Save to bytes
-                doc_bytes = io.BytesIO()
-                doc.save(doc_bytes)
-                doc_bytes.seek(0)
+                doc_buffer = BytesIO()
+                doc.save(doc_buffer)
+                doc_buffer.seek(0)
                 
                 from django.core.files.base import ContentFile
-                file.file.save(file.name, ContentFile(doc_bytes.read()), save=False)
-                file.size = doc_bytes.tell()
+                file.file.save(file.name, ContentFile(doc_buffer.read()), save=False)
+                file.size = doc_buffer.tell()
                 file.save()
                 
-                # Re-read for display
-                import mammoth
-                with file.file.open('rb') as docx_file:
-                    result = mammoth.convert_to_html(docx_file)
-                    file_content = result.value
+                # Re-read
+                file.file.open('rb')
+                file_bytes = file.file.read()
+                file.file.close()
+                file_stream = BytesIO(file_bytes)
+                result = mammoth.convert_to_html(file_stream)
+                file_content = result.value
             
             elif file_type == 'excel':
-                # Save Excel file
                 if not OPENPYXL_AVAILABLE:
-                    messages.error(request, 'Excel file editing is not available. Please install openpyxl library.')
+                    messages.error(request, 'Excel editing not available.')
                     return redirect('view_edit_file', project_id=project.id, file_id=file.id)
                 
                 import json
-                
-                # Get JSON data from form
                 excel_json = request.POST.get('excel_data', '')
                 data = json.loads(excel_json)
                 
-                # Create new workbook
                 wb = openpyxl.Workbook()
                 sheet = wb.active
                 
-                # Write headers
                 if data.get('headers'):
                     sheet.append(data['headers'])
-                
-                # Write rows
                 for row in data.get('rows', []):
                     sheet.append(row)
                 
-                # Save to file
-                import tempfile
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
-                    wb.save(tmp.name)
-                    tmp.seek(0)
-                    
-                    from django.core.files.base import ContentFile
-                    with open(tmp.name, 'rb') as f:
-                        file.file.save(file.name, ContentFile(f.read()), save=False)
-                    
-                    import os
-                    file.size = os.path.getsize(tmp.name)
-                    os.unlink(tmp.name)
+                excel_buffer = BytesIO()
+                wb.save(excel_buffer)
+                excel_buffer.seek(0)
                 
+                from django.core.files.base import ContentFile
+                file.file.save(file.name, ContentFile(excel_buffer.read()), save=False)
+                file.size = excel_buffer.tell()
                 file.save()
                 
-                # Re-read for display
-                wb = openpyxl.load_workbook(file.file.path)
+                # Re-read
+                file.file.open('rb')
+                file_bytes = file.file.read()
+                file.file.close()
+                file_stream = BytesIO(file_bytes)
+                wb = openpyxl.load_workbook(file_stream, data_only=True)
                 sheet = wb.active
                 excel_data = {'headers': [], 'rows': []}
                 for i, row in enumerate(sheet.iter_rows(values_only=True)):
                     if i == 0:
-                        excel_data['headers'] = list(row)
+                        excel_data['headers'] = [str(cell) if cell is not None else '' for cell in row]
                     else:
-                        excel_data['rows'].append(list(row))
+                        excel_data['rows'].append([str(cell) if cell is not None else '' for cell in row])
                 wb.close()
             
-            # Create version for file edit
             create_project_version(
                 project=project,
                 user=request.user,
@@ -1145,7 +1147,10 @@ def view_edit_file(request, project_id, file_id):
             messages.success(request, f'File "{file.name}" saved successfully!')
             
         except Exception as e:
-            messages.error(request, f'Failed to save file: {str(e)}')
+            print(f"❌ Save error: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
+            messages.error(request, f'Failed to save: {str(e)}')
     
     context = {
         'project': project,
@@ -1262,7 +1267,7 @@ def empty_trash(request):
 # USER PROFILE
 @login_required
 def profile(request, username=None):
-    """View user profile with upload statistics"""
+    """View user profile with upload statistics - ONLY ACTIVE PROJECTS"""
     if username:
         # View another user's profile
         profile_user = get_object_or_404(User, username=username)
@@ -1270,20 +1275,34 @@ def profile(request, username=None):
         # View own profile
         profile_user = request.user
     
-    # Get total uploads count
-    total_uploads = profile_user.get_total_uploads()
+    # Get ONLY active (non-deleted) projects for counting
+    active_projects = Project.objects.filter(
+        owner=profile_user,
+        is_deleted=False
+    )
+    
+    # Count total uploads from ACTIVE projects only
+    total_uploads = 0
+    for project in active_projects:
+        total_uploads += project.files.count()
+    
     formatted_count = User.format_upload_count(total_uploads)
     
-    # Get user's public projects
+    # Get user's public projects (active only)
     public_projects = Project.objects.filter(
         owner=profile_user,
         is_public=True,
         is_deleted=False
     ).order_by('-updated_at')[:6]
     
-    # Get statistics
-    total_projects = profile_user.projects.filter(is_deleted=False).count()
-    total_versions = ProjectVersion.objects.filter(created_by=profile_user).count()
+    # Get statistics - ACTIVE projects only
+    total_projects = active_projects.count()
+    
+    # Count versions from ACTIVE projects only
+    total_versions = ProjectVersion.objects.filter(
+        project__in=active_projects,
+        created_by=profile_user
+    ).count()
     
     context = {
         'profile_user': profile_user,
