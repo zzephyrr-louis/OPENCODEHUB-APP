@@ -23,7 +23,7 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() == "true"
 # Allowed Hosts Configuration
 if DEBUG:
     # Development: Allow local development
-    ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '.localhost', '0.0.0.0']
+    ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '.localhost', '0.0.0.0', 'testserver']
 else:
     # Production: Use environment variable
     ALLOWED_HOSTS = [
@@ -54,8 +54,13 @@ if DEBUG:
             f"http://localhost:{port}",
         ])
     # Add IDE browser preview proxy ports (VS Code, WebStorm, etc.)
-    for port in range(49000, 65000, 518):
+    # Add common proxy port ranges
+    proxy_ports = list(range(49000, 50000, 100)) + list(range(60000, 65000, 100))
+    for port in proxy_ports:
         CSRF_TRUSTED_ORIGINS.append(f"http://127.0.0.1:{port}")
+    
+    # Add specific browser preview port if detected
+    CSRF_TRUSTED_ORIGINS.append("http://127.0.0.1:61958")
 else:
     # Production: Use environment variable for security
     CSRF_TRUSTED_ORIGINS = [
