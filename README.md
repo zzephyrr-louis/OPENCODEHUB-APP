@@ -291,10 +291,7 @@ http://127.0.0.1:8000/admin/
 ---
 
 ## 🌐 Deployment
-
-### 🚧 **Status: Coming Soon**
-
-The application is currently in development. 
+https://csit327-g8-opencodehub-mciy.onrender.com/
 
 
 
