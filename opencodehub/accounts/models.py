@@ -73,6 +73,9 @@ class Project(models.Model):
     
     def get_shareable_link(self):
         """Generate the full shareable URL for this project"""
+        if not self.share_link:
+            self.share_link = uuid.uuid4()
+            self.save()
         return f"/share/{self.share_link}/"
 
 class ProjectFile(models.Model):
