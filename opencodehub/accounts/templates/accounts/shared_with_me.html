@@ -293,10 +293,17 @@
                 </div>
                 <div class="project-time">{{ project.updated_at|timesince }} ago</div>
                 <div>
-                    <span class="project-badge">
+                    {% if project.permission == 'edit' %}
+                    <span class="project-badge" style="background: #d4edda; color: #155724;">
+                        <i class="fas fa-edit"></i>
+                        Can Edit
+                    </span>
+                    {% else %}
+                    <span class="project-badge" style="background: #d1ecf1; color: #0c5460;">
                         <i class="fas fa-eye"></i>
                         View Only
                     </span>
+                    {% endif %}
                 </div>
                 <div class="project-menu">
                     <i class="fas fa-ellipsis-v"></i>

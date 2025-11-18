@@ -152,6 +152,27 @@ class ProjectVersion(models.Model):
             'timestamp': timezone.now().isoformat(),
         }
         self.save()
+
+class SharedProject(models.Model):
+    """Model for tracking project sharing with permission levels"""
+    PERMISSION_CHOICES = [
+        ('view', 'View Only'),
+        ('edit', 'Can Edit'),
+    ]
+    
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='shared_users')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='shared_projects_new')
+    permission = models.CharField(max_length=10, choices=PERMISSION_CHOICES, default='view')
+    shared_at = models.DateTimeField(default=timezone.now)
+    shared_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='projects_shared_by')
+    
+    class Meta:
+        unique_together = ['project', 'user']
+        ordering = ['-shared_at']
+    
+    def __str__(self):
+        return f"{self.project.title} shared with {self.user.username} ({self.get_permission_display()})"
+
 class Comment(models.Model):
     """Model for project comments"""
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='comments')
