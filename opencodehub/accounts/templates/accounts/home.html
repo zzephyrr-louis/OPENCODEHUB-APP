@@ -82,7 +82,7 @@
             <i class="fas fa-plus"></i>
             Create
             <div class="create-dropdown" id="createDropdown">
-                <a href="{% url 'create_project' %}" class="create-dropdown-item">New Folder</a>
+                <a href="{% url 'create_project' %}" class="create-dropdown-item">New Project</a>
                 <a href="#" class="create-dropdown-item" onclick="event.preventDefault(); openUploadFileModal()">Upload File</a>
                 <a href="#" class="create-dropdown-item" onclick="event.preventDefault(); openUploadFolderModal()">Upload Folder</a>
                 <a href="{% url 'create_document' %}" class="create-dropdown-item">Document</a>
@@ -105,12 +105,6 @@
                 Shared with me
             </a>
             
-            <a href="#" class="sidebar-item">
-                <i class="fas fa-clock"></i>
-                Recent
-            </a>
-            
-            <!-- Browse link below Recent -->
             <a href="{% url 'browse_projects' %}" class="sidebar-item">
                 <i class="fas fa-globe"></i>
                 Browse
@@ -214,10 +208,6 @@
                 <i class="fas fa-folder-open"></i>
                 <h3>No projects yet</h3>
                 <p>Create your first project to get started</p>
-                <a href="{% url 'create_project' %}" class="create-btn">
-                    <i class="fas fa-plus"></i>
-                    Create Project
-                </a>
             </div>
         </div>
         {% endif %}
