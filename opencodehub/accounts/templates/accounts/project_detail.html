@@ -1,4 +1,5 @@
 {% extends 'accounts/base.html' %}
+{% load project_permissions %}
 {% block content %}
 <div class="container mt-4">
   <!-- Back Button -->
@@ -89,46 +90,71 @@
       <!-- Share Form -->
       <form method="POST" action="{% url 'share_project' project.id %}" class="mb-3">
         {% csrf_token %}
-        <div class="input-group">
+        <div class="mb-3">
           <input 
             type="text" 
             name="share_with" 
             class="form-control" 
             placeholder="Enter username or email..."
-            style="border-radius: 12px 0 0 12px;"
+            style="border-radius: 12px;"
             required
           >
-          <button type="submit" class="btn btn-primary" style="border-radius: 0 12px 12px 0;">
-            <i class="fas fa-paper-plane"></i> Share
-          </button>
         </div>
+        <div class="d-flex gap-2 mb-3">
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="permission" id="viewPermission" value="view" checked>
+            <label class="form-check-label" for="viewPermission">
+              <i class="fas fa-eye text-info"></i> View Only
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="permission" id="editPermission" value="edit">
+            <label class="form-check-label" for="editPermission">
+              <i class="fas fa-edit text-success"></i> Can Edit
+            </label>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary w-100" style="border-radius: 12px;">
+          <i class="fas fa-paper-plane"></i> Share Project
+        </button>
       </form>
       
       <!-- List of people project is shared with -->
-      {% if project.shared_with.all %}
+      {% if project.shared_users.all %}
       <div class="shared-users-list">
         <h6 class="mb-3">
-          <i class="fas fa-users text-success"></i> Shared with ({{ project.shared_with.all.count }})
+          <i class="fas fa-users text-success"></i> Shared with ({{ project.shared_users.all.count }})
         </h6>
         <ul class="list-group">
-          {% for shared_user in project.shared_with.all %}
+          {% for shared in project.shared_users.all %}
           <li class="list-group-item d-flex justify-content-between align-items-center" style="border-radius: 10px; margin-bottom: 8px;">
             <div class="d-flex align-items-center gap-2">
               <div class="user-avatar-small">
-                {{ shared_user.first_name.0|upper }}{{ shared_user.last_name.0|upper }}
+                {{ shared.user.first_name.0|upper }}{{ shared.user.last_name.0|upper }}
               </div>
               <div>
-                <strong>{{ shared_user.first_name }} {{ shared_user.last_name }}</strong>
+                <strong>{{ shared.user.first_name }} {{ shared.user.last_name }}</strong>
                 <br>
-                <small class="text-muted">@{{ shared_user.username }}</small>
+                <small class="text-muted">@{{ shared.user.username }}</small>
               </div>
             </div>
-            <a href="{% url 'unshare_project' project.id shared_user.id %}" 
-              class="btn btn-sm btn-outline-danger"
-              style="border-radius: 8px;"
-              onclick="return confirm('Remove {{ shared_user.username }} from this project?')">
-              <i class="fas fa-times"></i> Remove
-            </a>
+            <div class="d-flex align-items-center gap-2">
+              {% if shared.permission == 'edit' %}
+                <span class="badge bg-success" style="border-radius: 8px;">
+                  <i class="fas fa-edit"></i> Can Edit
+                </span>
+              {% else %}
+                <span class="badge bg-info" style="border-radius: 8px;">
+                  <i class="fas fa-eye"></i> View Only
+                </span>
+              {% endif %}
+              <a href="{% url 'unshare_project' project.id shared.user.id %}" 
+                class="btn btn-sm btn-outline-danger"
+                style="border-radius: 8px;"
+                onclick="return confirm('Remove {{ shared.user.username }} from this project?')">
+                <i class="fas fa-times"></i> Remove
+              </a>
+            </div>
           </li>
           {% endfor %}
         </ul>
@@ -177,7 +203,7 @@
                 </a>
                 
                 {% comment %} Show delete button if user has permission {% endcomment %}
-                {% if project.owner == user or user in project.shared_with.all and project.allow_collaborators_delete %}
+                {% if project.owner == user or user|has_edit_permission:project and project.allow_collaborators_delete %}
                 <button type="button" 
                         class="btn btn-sm btn-danger" 
                         onclick="showDeleteModal('{{ file.id }}', '{{ file.name }}')"
@@ -194,8 +220,8 @@
         <p class="text-muted">No files uploaded yet.</p>
       {% endif %}
       
-      <!-- Only owner can upload files -->
-      {% if project.owner == user %}
+      <!-- Show upload buttons for owner and users with edit permission -->
+      {% if project.owner == user or user|has_edit_permission:project %}
       <div class="d-flex justify-content-between align-items-center mt-3 gap-2 flex-wrap">
         <!-- Upload Files Button -->
         <a href="{% url 'upload_file' project.id %}" class="btn btn-primary btn-sm" style="border-radius: 12px;">
@@ -207,7 +233,8 @@
           <i class="fas fa-code-branch"></i> Upload New Version
         </a>
         
-        {% comment %} Delete permission toggle {% endcomment %}
+        {% comment %} Delete permission toggle - only for owner {% endcomment %}
+        {% if project.owner == user %}
         <form method="POST" action="{% url 'toggle_delete_permission' project.id %}" class="d-inline">
           {% csrf_token %}
           <button type="submit" class="btn btn-sm btn-outline-secondary" style="border-radius: 12px;">
@@ -218,6 +245,7 @@
             {% endif %}
           </button>
         </form>
+        {% endif %}
       </div>
       {% endif %}
     </div>

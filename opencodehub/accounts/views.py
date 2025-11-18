@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.urls import reverse_lazy
 from django.views.generic import CreateView
 from .forms import CustomUserCreationForm, CustomLoginForm
-from .models import Project, ProjectFile, Comment, ProjectVersion
+from .models import Project, ProjectFile, ProjectVersion, Comment, User, SharedProject
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from accounts.models import User
@@ -218,7 +218,8 @@ def project_detail(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     
     # Check permissions - allow owner, shared users, or public projects
-    if not project.is_public and project.owner != request.user and request.user not in project.shared_with.all():
+    shared_project = SharedProject.objects.filter(project=project, user=request.user).first()
+    if not project.is_public and project.owner != request.user and not shared_project:
         messages.error(request, 'You do not have permission to view this project.')
         return redirect('home')
     
@@ -261,8 +262,9 @@ def upload_file(request, project_id):
     
     project = get_object_or_404(Project, id=project_id)
     
-    # Check if user is owner or has access
-    if project.owner != request.user and request.user not in project.shared_with.all():
+    # Check if user is owner or has edit access
+    shared_project = SharedProject.objects.filter(project=project, user=request.user).first()
+    if project.owner != request.user and (not shared_project or shared_project.permission != 'edit'):
         messages.error(request, 'You do not have permission to upload files to this project.')
         return redirect('project_detail', project_id=project.id)
     
@@ -353,7 +355,8 @@ def upload_version(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     
     # Check if user has permission to upload versions
-    if project.owner != request.user and request.user not in project.shared_with.all():
+    shared_project = SharedProject.objects.filter(project=project, user=request.user).first()
+    if project.owner != request.user and (not shared_project or shared_project.permission != 'edit'):
         messages.error(request, 'You do not have permission to upload versions to this project.')
         return redirect('project_detail', project_id=project.id)
     
@@ -477,14 +480,21 @@ def browse_projects(request):
 def shared_with_me(request):
     """View projects shared with the current user"""
     
-    # Get all projects where current user is in shared_with
-    shared_projects = Project.objects.filter(
-        shared_with=request.user
-    ).order_by('-updated_at')
+    # Get all SharedProject entries for current user
+    shared_entries = SharedProject.objects.filter(
+        user=request.user
+    ).select_related('project', 'project__owner').order_by('-shared_at')
+    
+    # Build project list with permission info
+    projects_with_permissions = []
+    for entry in shared_entries:
+        project = entry.project
+        project.permission = entry.permission  # Add permission to project object
+        projects_with_permissions.append(project)
     
     context = {
-        'projects': shared_projects,
-        'total_count': shared_projects.count()
+        'projects': projects_with_permissions,
+        'total_count': len(projects_with_permissions)
     }
     
     return render(request, 'accounts/shared_with_me.html', context)
@@ -498,6 +508,7 @@ def share_project(request, project_id):
     if request.method == 'POST':
         # Get username or email to share with
         share_with = request.POST.get('share_with', '').strip()
+        permission = request.POST.get('permission', 'view')  # Default to view permission
         
         if not share_with:
             messages.error(request, 'Please enter a username or email.')
@@ -515,18 +526,38 @@ def share_project(request, project_id):
                 return redirect('project_detail', project_id=project.id)
             
             # Check if already shared
-            if user_to_share in project.shared_with.all():
-                messages.warning(request, f'Project is already shared with {user_to_share.username}!')
+            existing_share = SharedProject.objects.filter(
+                project=project,
+                user=user_to_share
+            ).first()
+            
+            if existing_share:
+                # Update permission if already shared
+                if existing_share.permission != permission:
+                    existing_share.permission = permission
+                    existing_share.save()
+                    messages.success(request, f'Updated {user_to_share.username}\'s permission to {permission}!')
+                else:
+                    messages.warning(request, f'Project is already shared with {user_to_share.username} with {permission} permission!')
             else:
+                # Create new share
+                SharedProject.objects.create(
+                    project=project,
+                    user=user_to_share,
+                    permission=permission,
+                    shared_by=request.user
+                )
+                
+                # Also add to ManyToMany for backward compatibility
                 project.shared_with.add(user_to_share)
                 
                 create_project_version(
                     project=project,
                     user=request.user,
                     action='shared',
-                    description=f'Shared with {user_to_share.username}'
+                    description=f'Shared with {user_to_share.username} ({permission} permission)'
                 )
-                messages.success(request, f'Project shared with {user_to_share.username}!')
+                messages.success(request, f'Project shared with {user_to_share.username} with {permission} permission!')
         
         except User.DoesNotExist:
             messages.error(request, f'User "{share_with}" not found!')
@@ -541,8 +572,15 @@ def unshare_project(request, project_id, user_id):
     project = get_object_or_404(Project, id=project_id, owner=request.user)
     user_to_remove = get_object_or_404(User, id=user_id)
     
-    # Remove user from shared_with
+    # Remove from SharedProject model
+    SharedProject.objects.filter(
+        project=project,
+        user=user_to_remove
+    ).delete()
+    
+    # Also remove from ManyToMany for backward compatibility
     project.shared_with.remove(user_to_remove)
+    
     messages.success(request, f'Removed {user_to_remove.username} from project!')
     
     return redirect('project_detail', project_id=project.id)
@@ -667,7 +705,8 @@ def view_shared_project(request, share_uuid):
                 messages.error(request, 'This project is private. Please log in.')
                 return redirect('login')
             
-            if project.owner != request.user and request.user not in project.shared_with.all():
+            shared_project = SharedProject.objects.filter(project=project, user=request.user).first()
+            if project.owner != request.user and not shared_project:
                 messages.error(request, 'You do not have permission to view this private project.')
                 return redirect('home')
         
@@ -809,9 +848,11 @@ def view_version(request, project_id, version_id):
     version = get_object_or_404(ProjectVersion, id=version_id, project=project)
     
     # Check permissions
-    if not project.is_public and project.owner != request.user and request.user not in project.shared_with.all():
-        messages.error(request, 'You do not have permission to view this project.')
-        return redirect('home')
+    if not project.is_public:
+        shared_project = SharedProject.objects.filter(project=project, user=request.user).first()
+        if project.owner != request.user and not shared_project:
+            messages.error(request, 'You do not have permission to view this project.')
+            return redirect('home')
     
     # Get files from snapshot
     snapshot_files = version.files_snapshot.get('files', [])
@@ -830,9 +871,11 @@ def version_history(request, project_id):
     project = get_object_or_404(Project, id=project_id)
     
     # Check permissions
-    if not project.is_public and project.owner != request.user and request.user not in project.shared_with.all():
-        messages.error(request, 'You do not have permission to view this project.')
-        return redirect('home')
+    if not project.is_public:
+        shared_project = SharedProject.objects.filter(project=project, user=request.user).first()
+        if project.owner != request.user and not shared_project:
+            messages.error(request, 'You do not have permission to view this project.')
+            return redirect('home')
     
     versions = project.versions.all()
     
@@ -889,9 +932,11 @@ def delete_file(request, project_id, file_id):
     # Owner can always delete
     if project.owner == request.user:
         can_delete = True
-    # Collaborators can delete if owner allows it
-    elif request.user in project.shared_with.all() and project.allow_collaborators_delete:
-        can_delete = True
+    # Collaborators can delete if owner allows it and they have edit permission
+    else:
+        shared_project = SharedProject.objects.filter(project=project, user=request.user).first()
+        if shared_project and shared_project.permission == 'edit' and project.allow_collaborators_delete:
+            can_delete = True
     
     if not can_delete:
         messages.error(request, 'You do not have permission to delete files from this project.')
@@ -953,9 +998,11 @@ def view_edit_file(request, project_id, file_id):
     file = get_object_or_404(ProjectFile, id=file_id, project=project)
     
     # Check permissions
-    if not project.is_public and project.owner != request.user and request.user not in project.shared_with.all():
-        messages.error(request, 'You do not have permission to view this file.')
-        return redirect('project_detail', project_id=project.id)
+    if not project.is_public:
+        shared_project = SharedProject.objects.filter(project=project, user=request.user).first()
+        if project.owner != request.user and not shared_project:
+            messages.error(request, 'You do not have permission to view this file.')
+            return redirect('project_detail', project_id=project.id)
     
     # Define editable file types
     TEXT_EXTENSIONS = [
@@ -1056,7 +1103,9 @@ def view_edit_file(request, project_id, file_id):
     
     # Handle file save (POST)
     if request.method == 'POST' and is_editable:
-        can_edit = project.owner == request.user or request.user in project.shared_with.all()
+        # Check if user has edit permission
+        shared_project = SharedProject.objects.filter(project=project, user=request.user).first()
+        can_edit = project.owner == request.user or (shared_project and shared_project.permission == 'edit')
         
         if not can_edit:
             messages.error(request, 'You do not have permission to edit this file.')
@@ -1165,7 +1214,7 @@ def view_edit_file(request, project_id, file_id):
         'is_editable': is_editable,
         'file_content': file_content,
         'excel_data': excel_data,
-        'can_edit': project.owner == request.user or request.user in project.shared_with.all(),
+        'can_edit': project.owner == request.user or (SharedProject.objects.filter(project=project, user=request.user, permission='edit').exists()),
     }
     
     return render(request, 'accounts/view_edit_file.html', context)
